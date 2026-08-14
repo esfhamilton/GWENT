@@ -132,19 +132,24 @@ const leaderSelected = (leaderId) => {
     }
 };
 
-function getCardAbility(cardId) {
-    if (cardId === decoy) return ['Decoy', 'Swap this card with a unit card already in play.'];
-    if (cardId === scorchId) return ['Scorch', 'Destroy the strongest non-hero unit card or cards on the battlefield.'];
-    if (weatherCards.includes(cardId)) return ['Weather', 'Set the strength of affected non-hero units to 1.'];
-    if (cardId === clearWeather) return ['Clear Weather', 'Remove all weather effects from the battlefield.'];
-    if (cardId === dandelion) return ["Commander's Horn", 'Double the strength of non-hero units in this row.'];
-    if (combatSpies.concat(siegeSpies).includes(cardId)) return ['Spy', 'Play this card on your opponent\'s side and draw 2 cards.'];
-    if (medics.includes(cardId)) return ['Medic', 'Play a unit card from your discard pile.'];
-    if (tightBonds.includes(cardId)) return ['Tight Bond', 'Double the strength of cards with the same name in this row.'];
-    if (musterIds.includes(cardId)) return ['Muster', 'Find and play all cards of the same group from your deck.'];
-    if (moraleBoosters.includes(cardId)) return ['Morale Boost', 'Give every other unit in this row +1 strength.'];
-    if (heroes.includes(cardId)) return ['Hero', 'This card is not affected by special card effects.'];
-    return ['Ability', 'No special ability.'];
+function getCardAbilities(cardId) {
+    if (cardId === decoy) return [['Decoy', 'Swap this card with a unit card already in play.']];
+    if (cardId === commandersHorn) return [["Commander's Horn", 'Double the strength of all non-hero units in the same row.']];
+    if (cardId === scorchId) return [['Scorch', 'Destroy the strongest non-hero unit card or cards on the battlefield.']];
+    if (weatherCards.includes(cardId)) return [['Weather', 'Set the strength of affected non-hero units to 1.']];
+    if (cardId === clearWeather) return [['Clear Weather', 'Remove all weather effects from the battlefield.']];
+    if (cardId === villentretenmerth) return [['Scorch', 'Destroy the strongest opposing close combat unit card or cards when their combined strength is 10 or more.']];
+    if (cardId === dandelion) return [["Commander's Horn", 'Double the strength of non-hero units in this row.']];
+
+    const abilities = [];
+    if (combatSpies.concat(siegeSpies).includes(cardId)) abilities.push(['Spy', 'Play this card on your opponent\'s side and draw 2 cards.']);
+    if (medics.includes(cardId)) abilities.push(['Medic', 'Play a unit card from your discard pile.']);
+    if (tightBonds.includes(cardId)) abilities.push(['Tight Bond', 'Double the strength of cards with the same name in this row.']);
+    if (musterIds.includes(cardId)) abilities.push(['Muster', 'Find and play all cards of the same group from your deck.']);
+    if (moraleBoosters.includes(cardId)) abilities.push(['Morale Boost', 'Give every other unit in this row +1 strength.']);
+    if (heroes.includes(cardId)) abilities.push(['Hero', 'This card is not affected by special card effects.']);
+
+    return abilities.length > 0 ? abilities : [['Ability', 'No special ability.']];
 }
 
 function showCardDetail(cardId, description) {
@@ -159,8 +164,11 @@ function battlefieldCardSelected(card, event) {
     event.stopPropagation();
     if (gameEnded || cardSelectedFlag || switchTurnLock) return;
 
-    const [abilityName, abilityDescription] = getCardAbility(card.id);
-    showCardDetail(card.id, `${abilityName}: ${abilityDescription}`);
+    const abilities = getCardAbilities(card.id);
+    const abilityDetails = abilities
+        .map(([name, description]) => `<p><strong>${name}:</strong> ${description}</p>`)
+        .join('');
+    showCardDetail(card.id, abilityDetails);
 }
 
 function createCard(cardId, positionId, attribute, className = "card") {

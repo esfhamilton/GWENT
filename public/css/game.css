@@ -430,8 +430,13 @@ p {
     left: 50%;
     transform: translateX(-50%);
     width: min(58%, 62cqh);
-    color: gold;
-    font-size: 130%;
+    color: #a187f3;
+    font-size: 155%;
+}
+
+.cardDetailInfo p {
+    margin: 0.3em 0;
+    font-size: 100%;
 }
 
 .cardDetailClose {
