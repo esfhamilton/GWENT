@@ -11,6 +11,13 @@ socket.emit('rejoinRequest', SID);
 socket.emit('getPlayerDeck', SID, player);
 socket.emit('startCheck', SID);
 
+const playAgainBtn = document.getElementById('playAgainBtn');
+playAgainBtn.addEventListener('click', () => {
+    playAgainBtn.disabled = true;
+    playAgainBtn.textContent = 'Waiting for opponent...';
+    socket.emit('playAgain', SID, player);
+});
+
 // Room full error
 socket.on('full', (SID) => {
     document.getElementById('topMsg').innerHTML = `Error: Room ${SID} is full, please create a new room.`;
@@ -121,12 +128,40 @@ const grayscaleUsedLeaders = () => {
 
 const leaderSelected = (leaderId) => {
     if(handChosen && !cardSelectedFlag && !switchTurnLock && !gameEnded){
-        document.getElementById('cardDetailView').style = "display: fixed;";
-        setCardStyle('cardDetailView', leaderId);
-        document.getElementById('topMsg').innerHTML = abilityDescriptions[leaderId];
-        document.getElementById('topMsg2').innerHTML = "Press Esc to close";
+        showCardDetail(leaderId, abilityDescriptions[leaderId]);
     }
 };
+
+function getCardAbility(cardId) {
+    if (cardId === decoy) return ['Decoy', 'Swap this card with a unit card already in play.'];
+    if (cardId === scorchId) return ['Scorch', 'Destroy the strongest non-hero unit card or cards on the battlefield.'];
+    if (weatherCards.includes(cardId)) return ['Weather', 'Set the strength of affected non-hero units to 1.'];
+    if (cardId === clearWeather) return ['Clear Weather', 'Remove all weather effects from the battlefield.'];
+    if (cardId === dandelion) return ["Commander's Horn", 'Double the strength of non-hero units in this row.'];
+    if (combatSpies.concat(siegeSpies).includes(cardId)) return ['Spy', 'Play this card on your opponent\'s side and draw 2 cards.'];
+    if (medics.includes(cardId)) return ['Medic', 'Play a unit card from your discard pile.'];
+    if (tightBonds.includes(cardId)) return ['Tight Bond', 'Double the strength of cards with the same name in this row.'];
+    if (musterIds.includes(cardId)) return ['Muster', 'Find and play all cards of the same group from your deck.'];
+    if (moraleBoosters.includes(cardId)) return ['Morale Boost', 'Give every other unit in this row +1 strength.'];
+    if (heroes.includes(cardId)) return ['Hero', 'This card is not affected by special card effects.'];
+    return ['Ability', 'No special ability.'];
+}
+
+function showCardDetail(cardId, description) {
+    setCardStyle('cardDetailView', cardId);
+    document.getElementById('cardDetailInfo').innerHTML = `${description}<p class="cardDetailClose">Press Esc to close</p>`;
+    document.getElementById('cardDetailInfo').style.display = 'block';
+    document.getElementById('topMsg').innerHTML = '';
+    document.getElementById('topMsg2').innerHTML = '';
+}
+
+function battlefieldCardSelected(card, event) {
+    event.stopPropagation();
+    if (gameEnded || cardSelectedFlag || switchTurnLock) return;
+
+    const [abilityName, abilityDescription] = getCardAbility(card.id);
+    showCardDetail(card.id, `${abilityName}: ${abilityDescription}`);
+}
 
 function createCard(cardId, positionId, attribute, className = "card") {
     let card = document.createElement('div');
@@ -134,7 +169,9 @@ function createCard(cardId, positionId, attribute, className = "card") {
     card.style.display = styles[cardId].display;
     card.className = className;
     card.setAttribute('id', cardId);
-    card.setAttribute('onclick', attribute);
+    card.setAttribute('onclick', className === 'cardSmall'
+        ? "battlefieldCardSelected(this, event)"
+        : attribute);
     document.getElementById(positionId).appendChild(card);
 }
 
@@ -1084,7 +1121,10 @@ socket.on('endRound', () => {
 
 socket.on('results', () => {
     gameEnded = true;
-    document.getElementById('topMsg2').innerHTML = "Press F5 to play again";
+    playAgainBtn.style.display = 'block';
+    playAgainBtn.disabled = false;
+    playAgainBtn.textContent = 'Play Again';
+    document.getElementById('topMsg2').innerHTML = "Both players must choose Play Again to start a new match.";
     
     if (pLife == 0 && oLife == 0){
         document.getElementById('topMsg').innerHTML = "Game is a Draw!";
@@ -1095,6 +1135,14 @@ socket.on('results', () => {
     else{
         document.getElementById('topMsg').innerHTML = "You Lose!";
     }    
+});
+
+socket.on('rematchWaiting', () => {
+    document.getElementById('topMsg2').innerHTML = "Waiting for opponent to choose Play Again...";
+});
+
+socket.on('rematchReady', () => {
+    window.location.reload();
 });
 
 function roundWon() {
@@ -1425,6 +1473,7 @@ function keyPressed(event) {
             document.getElementById('leaderInstructions').innerHTML = getLeaderInstructionText();
             document.getElementById('instructions').innerHTML = instructionTextHide;
             document.getElementById('cardDetailView').style  = "display: none;";
+            document.getElementById('cardDetailInfo').style.display = 'none';
             if(releaseTurnLockOnEsc){
                 releaseTurnLockOnEsc = false;
                 socket.emit('switchTurn', SID, [], [], hand.length, true);

@@ -89,7 +89,8 @@ p {
 }
 
 #playerFirstBtn,
-#opponentFirstBtn {
+#opponentFirstBtn,
+#playAgainBtn {
     margin-top: 15px;
     cursor: pointer;
     background-color: #222222;
@@ -120,6 +121,22 @@ p {
 
 #opponentFirstBtn:hover {
     color: rgb(156, 0, 0);
+}
+
+#playAgainBtn {
+    position: absolute;
+    z-index: 101;
+    top: 7%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.4em 1.2em;
+    color: gold;
+    cursor: pointer;
+}
+
+#playAgainBtn:disabled {
+    cursor: wait;
+    color: #999;
 }
 
 /* ------ GAME COMPONENTS ------ */
@@ -396,11 +413,31 @@ p {
 .cardDetailView {
     position: absolute;
     display: none;
-    top: 25%;
-    left: 44%;
+    z-index: 101;
+    top: 5%;
+    left: 50%;
+    transform: translateX(-50%);
     height: 36cqh;
     width: 21.6cqh;
     border-radius: 5px;
+}
+
+.cardDetailInfo {
+    position: absolute;
+    display: none;
+    z-index: 101;
+    top: 43%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(58%, 62cqh);
+    color: gold;
+    font-size: 130%;
+}
+
+.cardDetailClose {
+    margin-top: 0.65em;
+    font-size: 78%;
+    color: #a187f3;
 }
 
 .cardSelected {
@@ -422,6 +459,10 @@ p {
     float: left;
     height: 13cqh;
     width: 7.2cqh;
+}
+
+.cardSmall:hover {
+    box-shadow: 0 0 0 2px gold inset;
 }
 
 /* one item */

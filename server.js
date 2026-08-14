@@ -14,6 +14,7 @@ let gameData = {};
 let redrawnCheck = {};
 let roomPassCount = {};
 let roomFirstTurn = {};
+let rematchCheck = {};
 
 function shuffle(deck) {
     var currentIndex = deck.length, temporaryValue, randomIndex;
@@ -72,18 +73,15 @@ io.on('connection', (socket) => {
     // Reconnects user to room with each new page
     socket.on('rejoinRequest', (SID) => {         
         var numClients = io.sockets.adapter.rooms[''+SID];
-        // Room needs to be recreated
+        // Keep the room listed even if both clients are currently reloading.
         if (!openRooms.includes(SID)){
-            socket.join(SID);
-            openRooms.push(SID);   
+            openRooms.push(SID);
         }
-        if (numClients != undefined){
-            if (numClients.length<2){
-                socket.join(SID);
-            } 
-            else {
-                socket.emit('full', SID);
-            }
+        if (numClients === undefined || numClients.length < 2){
+            socket.join(SID);
+        }
+        else {
+            socket.emit('full', SID);
         }       
     });
     
@@ -220,6 +218,29 @@ io.on('connection', (socket) => {
             io.in(SID).emit('results');
         }   
     });
+
+    // Start a new match only when both players have explicitly opted in.
+    socket.on('playAgain', (SID, player) => {
+        if (!(SID in rematchCheck)) rematchCheck[SID] = {};
+        rematchCheck[SID][player] = true;
+
+        if (rematchCheck[SID].A && rematchCheck[SID].B) {
+            delete rematchCheck[SID];
+            io.in(SID).emit('rematchReady');
+
+            // Release both old sockets before their pages reload, so neither
+            // reconnect is mistaken for a third player in a full room.
+            let room = io.sockets.adapter.rooms[''+SID];
+            if (room !== undefined) {
+                Object.keys(room.sockets).forEach((socketId) => {
+                    io.sockets.sockets[socketId].leave(SID);
+                });
+            }
+        }
+        else {
+            socket.emit('rematchWaiting');
+        }
+    });
     
     socket.on('disconnect', () => {
         // Check each open room and remove SID if every user has disconnected 
@@ -228,6 +249,7 @@ io.on('connection', (socket) => {
             if (numClients === undefined){
                 if (index > -1) {
                     openRooms.splice(index, 1);
+                    delete rematchCheck[SID];
                 }
             }
         });
