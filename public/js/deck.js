@@ -155,6 +155,56 @@ function removeFromDeck(id) {
     }
 }
 
+function getSuggestedUnitScore(cardId) {
+    let score = cardPowers[cardId] ?? 0;
+    if (heroes.includes(cardId)) score += 100;
+    if (combatSpies.concat(siegeSpies).includes(cardId)) score += 60;
+    if (medics.includes(cardId)) score += 35;
+    if (tightBonds.includes(cardId)) score += 25;
+    if (musterIds.includes(cardId)) score += 25;
+    if (moraleBoosters.includes(cardId)) score += 18;
+
+    // Preserve each faction's strongest intended play style when scores tie.
+    if (faction === 'NR' && tightBonds.includes(cardId)) score += 20;
+    if (faction === 'NG' && combatSpies.concat(siegeSpies).includes(cardId)) score += 20;
+    if (faction === 'ST' && (musterIds.includes(cardId) || moraleBoosters.includes(cardId))) score += 15;
+    if (faction === 'MO' && musterIds.includes(cardId)) score += 20;
+
+    return score;
+}
+
+function clearDeck() {
+    while (deck.length > 0) removeFromDeck(deck[0]);
+}
+
+function suggestDeck() {
+    clearDeck();
+
+    const unitCandidates = Object.keys(cardsAvailable)
+        .filter((cardId) => unitCards.includes(cardId) && (cardId.startsWith(faction) || cardId.startsWith('neutral')))
+        .sort((first, second) => getSuggestedUnitScore(second) - getSuggestedUnitScore(first) || first.localeCompare(second));
+
+    // Add exactly 22 units, respecting every card's available copy count.
+    for (const cardId of unitCandidates) {
+        while (cardsAvailable[cardId] > 0 && unitCardsPicked < 22) addToDeck(cardId);
+        if (unitCardsPicked === 22) break;
+    }
+
+    const factionSpecials = {
+        NR: [decoy, commandersHorn, scorchId, clearWeather, impenetrableFog],
+        NG: [decoy, commandersHorn, scorchId, clearWeather, torrentialRain],
+        ST: [decoy, commandersHorn, scorchId, clearWeather, bitingFrost],
+        MO: [decoy, commandersHorn, scorchId, clearWeather, bitingFrost, impenetrableFog, torrentialRain]
+    };
+
+    // A compact deterministic special-card package complements each faction's units.
+    factionSpecials[faction].forEach((cardId) => {
+        if (cardsAvailable[cardId] > 0) addToDeck(cardId);
+    });
+
+    document.getElementById('info').innerHTML = 'Suggested deck added. Choose your preferred leader, then press Next when ready.';
+}
+
 function submit() {
     if (leader===undefined) {
         document.getElementById('info').innerHTML = "You need to select a leader first.";

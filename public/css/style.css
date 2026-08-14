@@ -79,10 +79,10 @@ span{
     -webkit-background-clip:text;
  }
 
- .info {
+.info {
     text-align: center; 
     font-size: 130%; 
-    margin: 4% 20%; 
+    margin: 4% 20% 1%;
 }
 
 .stickyPlaceholder {
@@ -101,6 +101,11 @@ span{
 .unitCardCount {
     font-size: 170%;
     margin: 2px auto;
+}
+
+.suggestDeckBtn {
+    margin: 10px auto 2px;
+    padding: 0.4em 1em;
 }
 
 /* ------ BUTTONS ------ */
