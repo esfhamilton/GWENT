@@ -9,6 +9,20 @@ socket.emit('rejoinRequest', SID);
 
 let unitCardsPicked = 0;
 
+const abilityKey = document.getElementById('abilityKey');
+const abilityKeyBtn = document.getElementById('abilityKeyBtn');
+const abilityKeyClose = document.getElementById('abilityKeyClose');
+
+function setAbilityKeyOpen(isOpen) {
+    abilityKey.hidden = !isOpen;
+    abilityKeyBtn.setAttribute('aria-expanded', String(isOpen));
+    if (isOpen) abilityKeyClose.focus();
+    else abilityKeyBtn.focus();
+}
+
+abilityKeyBtn.addEventListener('click', () => setAbilityKeyOpen(abilityKey.hidden));
+abilityKeyClose.addEventListener('click', () => setAbilityKeyOpen(false));
+
 function createLeaderCard(i) {
     let leaderCard = document.createElement('div');
     leaderCard.className = "leaderCard";

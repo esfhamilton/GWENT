@@ -14,8 +14,29 @@
                 <p class="info" id="info">Select a Leader and click on the cards in the Available column below to add them to your deck. When you're ready press the Next button to continue.</p>
                 <div class="deck-actions">
                     <button class="btn btn-secondary suggestDeckBtn" id="suggestDeckBtn" type="button" onclick="suggestDeck()">Suggest Deck</button>
+                    <button class="btn btn-secondary ability-key-button" id="abilityKeyBtn" type="button" aria-expanded="false" aria-controls="abilityKey">Card Ability Key</button>
                     <button class="btn" type="button" onclick="submit()">Next</button>
                 </div>
+                <section class="ability-key" id="abilityKey" hidden aria-label="Card ability key">
+                    <div class="ability-key-header">
+                        <h2>Card Ability Key</h2>
+                        <button class="ability-key-close" id="abilityKeyClose" type="button" aria-label="Close card ability key">×</button>
+                    </div>
+                    <div class="ability-key-grid">
+                        <div class="ability-key-item"><img src="img/abilities/spy.png" alt=""><div><strong>Spy</strong><span>Play on your opponent's side and draw two cards.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/medic.png" alt=""><div><strong>Medic</strong><span>Play a unit card from your discard pile.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/tight-bond.png" alt=""><div><strong>Tight Bond</strong><span>Double same-named cards in this row.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/muster.png" alt=""><div><strong>Muster</strong><span>Play all cards with the same Muster group.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/morale-boost.png" alt=""><div><strong>Morale Boost</strong><span>Give every other unit in the row +1 strength.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/commanders-horn.png" alt=""><div><strong>Commander's Horn</strong><span>Double the strength of a row.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/scorch.png" alt=""><div><strong>Scorch</strong><span>Destroy the strongest eligible unit cards.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/decoy.png" alt=""><div><strong>Decoy</strong><span>Return a unit card from the board to your hand.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/biting-frost.png" alt=""><div><strong>Biting Frost</strong><span>Reduce Close Combat units to 1 strength.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/impenetrable-fog.png" alt=""><div><strong>Impenetrable Fog</strong><span>Reduce Ranged units to 1 strength.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/torrential-rain.png" alt=""><div><strong>Torrential Rain</strong><span>Reduce Siege units to 1 strength.</span></div></div>
+                        <div class="ability-key-item"><img src="img/abilities/clear-weather.png" alt=""><div><strong>Clear Weather</strong><span>Remove all weather effects from play.</span></div></div>
+                    </div>
+                </section>
                 <div class="leaders" id="leaderSection">
                     <h3>Leader</h3>
                 </div>

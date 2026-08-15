@@ -51,6 +51,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid rgba(206, 190, 255, 0
 .deck-panel { width: min(100%, 82rem); }
 .deck-actions { display: flex; align-items: center; justify-content: center; gap: 0.65rem; margin: 0.25rem 0 1.25rem; }
 .btn-secondary { color: var(--accent-bright); background: rgba(14, 8, 23, 0.42); border-color: rgba(182, 155, 255, 0.3); box-shadow: none; }
+.ability-key { margin: 0 0 1.25rem; padding: 1rem; color: var(--text); background: rgba(12, 7, 20, 0.45); border: 1px solid rgba(182, 155, 255, 0.18); border-radius: 8px; }
+.ability-key[hidden] { display: none; }
+.ability-key-header { display: flex; align-items: center; justify-content: space-between; padding: 0 0 0.65rem; border-bottom: 1px solid rgba(182, 155, 255, 0.13); }
+.ability-key-header h2 { color: var(--accent-bright); font-size: 1rem; font-weight: 600; letter-spacing: 0.04em; }
+.ability-key-close { min-height: auto; padding: 0 0.35rem; color: var(--muted); background: transparent; border: 0; box-shadow: none; font-size: 1.4rem; line-height: 1; }
+.ability-key-close:hover { color: var(--text); background: transparent; box-shadow: none; transform: none; }
+.ability-key-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; padding-top: 0.8rem; text-align: left; }
+.ability-key-item { display: flex; align-items: center; gap: 0.55rem; min-height: 3.4rem; padding: 0.4rem; border-radius: 5px; }
+.ability-key-item:hover { background: rgba(182, 155, 255, 0.06); }
+.ability-key-item img { width: 2.35rem; height: 2.35rem; object-fit: contain; }
+.ability-key-item strong, .ability-key-item span { display: block; }
+.ability-key-item strong { color: var(--accent-bright); font-size: 0.82rem; font-weight: 600; }
+.ability-key-item span { margin-top: 0.12rem; color: var(--muted); font-family: Arial, sans-serif; font-size: 0.7rem; line-height: 1.25; }
 .deck-progress { position: sticky; top: 0; z-index: 10; margin: 0 0 1rem; padding: 0.7rem 1rem; background: rgba(24, 15, 37, 0.96); border: 1px solid rgba(182, 155, 255, 0.2); border-radius: 7px; box-shadow: 0 7px 18px rgba(0, 0, 0, 0.22); backdrop-filter: blur(8px); }
 .unitCardCount { margin: 0; color: #f0ebff; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.025em; }
 .suggestDeckBtn { margin: 0; font-size: 0.82rem; }
@@ -66,4 +79,5 @@ button:focus-visible, a:focus-visible { outline: 2px solid rgba(206, 190, 255, 0
 .abilityDesc { display: none; margin: 50% 3px; color: #fff; font-size: 60%; text-align: center; text-shadow: 0 1px 3px #000; }
 
 @media only screen and (max-width: 1980px) { .leaderCard, .card { width: 115px; height: 192px; } }
-@media (max-width: 760px) { .app-shell { padding-top: 2rem; } .panel { padding: 1.15rem 1rem; } .page-content { margin-top: 1.75rem; } .leaders { min-height: 0; } .deck-progress { margin-inline: -0.35rem; border-radius: 5px; } .deck-columns { grid-template-columns: 1fr; } .column { min-height: 12rem; } }
+@media (max-width: 760px) { .app-shell { padding-top: 2rem; } .panel { padding: 1.15rem 1rem; } .page-content { margin-top: 1.75rem; } .deck-actions { flex-wrap: wrap; } .ability-key-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .leaders { min-height: 0; } .deck-progress { margin-inline: -0.35rem; border-radius: 5px; } .deck-columns { grid-template-columns: 1fr; } .column { min-height: 12rem; } }
+@media (max-width: 430px) { .ability-key-grid { grid-template-columns: 1fr; } }
