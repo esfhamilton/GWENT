@@ -472,8 +472,67 @@ p {
 
 .cardSmall {
     float: left;
-    height: 13cqh;
-    width: 7.2cqh;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    height: 10.35cqh;
+    width: 8.2cqh;
+    border-radius: 5px;
+}
+
+.battlefieldCardArt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: 100%;
+    height: 14.8cqh;
+    pointer-events: none;
+}
+
+.cardPowerBadge {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    width: 2.25cqh;
+    height: 2.25cqh;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 1.32cqh;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 1px 2px #000;
+}
+
+.cardPowerBadge img,
+.cardPowerBadge span {
+    position: absolute;
+}
+
+.cardPowerBadge img {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.cardPowerBadge span {
+    z-index: 1;
+    top: 48%;
+    left: 49.5%;
+    min-width: 1em;
+    text-align: center;
+    transform: translate(-50%, -50%);
+}
+
+.cardPowerBadge.is-boosted span {
+    color: #62c75d;
+}
+
+.cardPowerBadge.is-reduced span {
+    color: #cf4f4f;
 }
 
 .cardSmall:hover {

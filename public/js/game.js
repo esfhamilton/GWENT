@@ -221,14 +221,38 @@ function battlefieldCardSelected(card, event) {
 
 function createCard(cardId, positionId, attribute, className = "card") {
     let card = document.createElement('div');
-    card.style.background = styles[cardId].background;
-    card.style.display = styles[cardId].display;
     card.className = className;
     card.setAttribute('id', cardId);
     card.setAttribute('onclick', className === 'cardSmall'
         ? "battlefieldCardSelected(this, event)"
         : attribute);
+
+    if (className === 'cardSmall') {
+        const cardArt = document.createElement('div');
+        cardArt.className = 'battlefieldCardArt';
+        cardArt.style.background = styles[cardId].background;
+        cardArt.style.display = styles[cardId].display;
+        card.appendChild(cardArt);
+    }
+    else {
+        card.style.background = styles[cardId].background;
+        card.style.display = styles[cardId].display;
+    }
+
     document.getElementById(positionId).appendChild(card);
+}
+
+function migrateBattlefieldCardArt() {
+    document.querySelectorAll('.cardSmall').forEach((card) => {
+        if (card.querySelector('.battlefieldCardArt') || !card.style.background) return;
+
+        const cardArt = document.createElement('div');
+        cardArt.className = 'battlefieldCardArt';
+        cardArt.style.background = card.style.background;
+        cardArt.style.display = 'block';
+        card.style.background = '';
+        card.prepend(cardArt);
+    });
 }
 
 function drawCardFromDeck(attribute) {
@@ -1002,15 +1026,16 @@ const animateThenUpdatePowerValues = async (scorchedCards) => {
 };
 
 const animateScorch = async (scorchedCard) => {
-        scorchedCard.style.backgroundImage = "url(img/anim_scorch.png)";
-        scorchedCard.style.backgroundSize = "cover";
+        const cardArt = scorchedCard.querySelector('.battlefieldCardArt') || scorchedCard;
+        cardArt.style.backgroundImage = "url(img/anim_scorch.png)";
+        cardArt.style.backgroundSize = "cover";
 
 		fadeIn(scorchedCard, 300);
         await sleep(1300);
 		fadeOut(scorchedCard, 300);
         await sleep(300);
-		scorchedCard.style.backgroundSize = ""; 
-        scorchedCard.style.backgroundImage = "";
+		cardArt.style.backgroundSize = "";
+        cardArt.style.backgroundImage = "";
 }
 
 function sleep(ms) {
@@ -1466,6 +1491,52 @@ async function updatePowerValues() {
     
     document.getElementById("opTotalPower").innerHTML = powerLevels["opTotalPower"];
     document.getElementById("totalPower").innerHTML = powerLevels["totalPower"];
+    updateBattlefieldCardPowerBadges();
+}
+
+// Return the same contribution a non-hero unit makes to its row total. This
+// keeps the on-card indicator in lockstep with the existing scoring rules.
+function getCurrentCardPower(cardId, row, rowIndex) {
+    const basePower = getBasePower(cardId, row);
+    const bondMultiplier = tightBondMods[row][cardId] ?? 1;
+    const hornInRow = $('.' + row.slice(0, -4).concat('Horn')).find('.cardSmall')[0];
+    let currentPower = basePower * bondMultiplier;
+
+    if (hornInRow !== undefined || doubledRows.includes(row)) {
+        currentPower += basePower * bondMultiplier;
+        if (moraleBoosters.includes(cardId)) currentPower += boostableCards[rowIndex];
+        if (dandelion === cardId && hornInRow === undefined) currentPower -= basePower;
+    }
+
+    if (moraleBoosters.includes(cardId)) currentPower += boostableCards[rowIndex];
+    return currentPower;
+}
+
+function updateBattlefieldCardPowerBadges() {
+    rowIds.forEach((row, rowIndex) => {
+        $('.' + row).find('.cardSmall').each(function () {
+            const cardId = this.id;
+            const existingBadge = this.querySelector('.cardPowerBadge');
+
+            if (heroes.includes(cardId) || cardPowers[cardId] === undefined) {
+                if (existingBadge) existingBadge.remove();
+                return;
+            }
+
+            const currentPower = getCurrentCardPower(cardId, row, rowIndex);
+            if (currentPower === cardPowers[cardId]) {
+                if (existingBadge) existingBadge.remove();
+                return;
+            }
+
+            const badge = existingBadge || document.createElement('div');
+            badge.className = `cardPowerBadge ${currentPower > cardPowers[cardId] ? 'is-boosted' : 'is-reduced'}`;
+            badge.setAttribute('aria-label', `Current strength: ${currentPower}`);
+            badge.innerHTML = '<img src="img/power_icon.png" alt=""><span></span>';
+            badge.querySelector('span').textContent = currentPower;
+            if (!existingBadge) this.appendChild(badge);
+        });
+    });
 }
 
 let weatherEffects = [];
@@ -1595,6 +1666,11 @@ function restoreGameSnapshot(snapshot) {
         if (saved.style === null) element.removeAttribute('style');
         else element.setAttribute('style', saved.style);
     });
+
+    // Older snapshots stored battlefield artwork directly on .cardSmall.
+    // Move it into the fixed-height art layer so the bottom 15% is clipped
+    // instead of the entire card being resized to fit the shorter viewport.
+    migrateBattlefieldCardArt();
 
     // Do not resume a half-completed card-selection sequence after a reload.
     cardSelectedFlag = false;
