@@ -1146,8 +1146,8 @@ async function syncWithOpponent(cardIds, posIds, opHandSize, abilityUsed) {
         else if(weatherCards.includes(cardIds[0])) {
             if(!weatherEffects.includes(cardIds[0])){
                 selectedCard = cardIds[0];
-                weatherEffects.push(selectedCard);
                 putCardOnBoard(selectedCard);
+                weatherEffects.push(selectedCard);
             }
         }
         else if (cardIds[0] === clearWeather){
