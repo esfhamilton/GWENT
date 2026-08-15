@@ -26,6 +26,10 @@ socket.on('noDeck', () => {
     document.getElementById('topMsg').innerHTML = `Error: No Deck has been Built.`;
 });
 
+socket.on('invalidAction', () => {
+    document.getElementById('topMsg').innerHTML = 'That action is no longer valid. Please refresh the game.';
+});
+
 let factionId, leaderId, deck, index, firstTurn;
 let hand = [];
 
@@ -1607,6 +1611,7 @@ function restoreGameSnapshot(snapshot) {
 
 if (restoredGameSnapshot) {
     restoreGameSnapshot(restoredGameSnapshot);
+    socket.emit('resumePlayer', SID, player);
 }
 else {
     socket.emit('getPlayerDeck', SID, player);

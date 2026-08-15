@@ -15,6 +15,20 @@ let redrawnCheck = {};
 let roomPassCount = {};
 let roomFirstTurn = {};
 let rematchCheck = {};
+let roomTurn = {};
+
+const roomId = (SID) => String(SID);
+const otherPlayer = (player) => player === 'A' ? 'B' : 'A';
+
+function actionIsAuthorised(socket, SID, player = socket.player) {
+    const room = roomId(SID);
+    return (player === 'A' || player === 'B') &&
+        socket.roomId === room && socket.player === player && socket.rooms && socket.rooms[room];
+}
+
+function rejectAction(socket) {
+    socket.emit('invalidAction');
+}
 
 function shuffle(deck) {
     var currentIndex = deck.length, temporaryValue, randomIndex;
@@ -107,16 +121,20 @@ io.on('connection', (socket) => {
     
     // Returns corresponding deck to the player
     socket.on('getPlayerDeck', (SID, player) => {
-        let PID = SID + player;
+        const room = roomId(SID);
+        if ((socket.player && (socket.roomId !== room || socket.player !== player)) ||
+            !socket.rooms || !socket.rooms[room] || (player !== 'A' && player !== 'B')) {
+            rejectAction(socket);
+            return;
+        }
+
+        let PID = room + player;
         // Catch if game has been entered without a deck
         if(gameData[PID] != undefined){
+            socket.roomId = room;
+            socket.player = player;
             startCheck[PID] = "Added";
-            if (player === 'A') { 
-                socket.emit('playerAssigned', gameData[PID]["faction"], gameData[PID]["leader"], shuffle(gameData[PID]["fullDeck"]));
-            }
-            else {
-                socket.emit('playerAssigned', gameData[PID]["faction"], gameData[PID]["leader"], shuffle(gameData[PID]["fullDeck"])); 
-            }
+            socket.emit('playerAssigned', gameData[PID]["faction"], gameData[PID]["leader"], shuffle(gameData[PID]["fullDeck"]));
         } 
         else{
             socket.emit('noDeck');
@@ -125,73 +143,106 @@ io.on('connection', (socket) => {
 
     // Checks whether both players are on the game.html page
     socket.on('startCheck', (SID) => {
-        if(SID in roomFirstTurn) delete roomFirstTurn[SID];
-        if ((SID+'A') in startCheck && (SID+'B') in startCheck) {
-            delete startCheck[SID+'A'];
-            delete startCheck[SID+'B'];
-            roomPassCount[SID] = 0;
-            io.in(SID).emit('startGame');
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room)) return rejectAction(socket);
+        if(room in roomFirstTurn) delete roomFirstTurn[room];
+        if ((room+'A') in startCheck && (room+'B') in startCheck) {
+            delete startCheck[room+'A'];
+            delete startCheck[room+'B'];
+            roomPassCount[room] = 0;
+            io.in(room).emit('startGame');
         } 
     });
     
     socket.on('getOpponentDeck', (SID, player) => {
-        if(!(SID in roomFirstTurn)) roomFirstTurn[SID] = Math.random()>0.5 ? 'A':'B';
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room, player)) return rejectAction(socket);
+        if(!(room in roomFirstTurn)) roomFirstTurn[room] = Math.random()>0.5 ? 'A':'B';
         let OID;
         if (player === 'A') {
-            OID = SID + 'B';
+            OID = room + 'B';
             socket.emit('opponentDeck', gameData[OID]["faction"], gameData[OID]["leader"], gameData[OID]["deck"]);
         }
         else {
-            OID = SID + 'A';
+            OID = room + 'A';
             socket.emit('opponentDeck', gameData[OID]["faction"], gameData[OID]["leader"], gameData[OID]["deck"]); 
         }
     });
     
     // Checks if players have redrawn the starting hand
     socket.on('cardsRedrawn', (SID, player, deck, firstTurn) => {
-        gameData[SID + player]["deck"] = deck;
-        if(firstTurn) roomFirstTurn[SID] = firstTurn;
-        if(SID in redrawnCheck) {
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room, player) || !Array.isArray(deck)) return rejectAction(socket);
+        gameData[room + player]["deck"] = deck;
+        if(firstTurn === 'A' || firstTurn === 'B') roomFirstTurn[room] = firstTurn;
+        if(room in redrawnCheck) {
             // Prevents crash from page refresh, should be true
-            if (redrawnCheck[SID] != player) {
-                delete redrawnCheck[SID];
-                io.in(SID).emit('firstTurn', roomFirstTurn[SID]);
+            if (redrawnCheck[room] != player) {
+                delete redrawnCheck[room];
+                roomTurn[room] = roomFirstTurn[room];
+                io.in(room).emit('firstTurn', roomFirstTurn[room]);
             }       
         }
         else {
-            redrawnCheck[SID] = player;
+            redrawnCheck[room] = player;
             socket.emit('waiting');
         }
     });
 
     socket.on('passTurn', (SID) => {
-        roomPassCount[SID] += 1;
-        if (roomPassCount[SID] === 2) {
-            roomPassCount[SID] = 0;
-            io.in(SID).emit('endRound');
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player)) return rejectAction(socket);
+        roomPassCount[room] = (roomPassCount[room] || 0) + 1;
+        if (roomPassCount[room] === 2) {
+            roomPassCount[room] = 0;
+            delete roomTurn[room];
+            io.in(room).emit('endRound');
         }
         else {
-            io.in(SID).emit('passedTurn');
+            roomTurn[room] = otherPlayer(socket.player);
+            io.in(room).emit('passedTurn');
         }
+    });
+
+    // A restored game page must re-bind its new socket without asking for a
+    // newly shuffled deck or participating in the start-game barrier again.
+    socket.on('resumePlayer', (SID, player) => {
+        const room = roomId(SID);
+        if ((socket.player && (socket.roomId !== room || socket.player !== player)) ||
+            !socket.rooms || !socket.rooms[room] || (player !== 'A' && player !== 'B') ||
+            !gameData[room + player]) {
+            return rejectAction(socket);
+        }
+        socket.roomId = room;
+        socket.player = player;
     });
 
     socket.on('sendMonsterCard', (SID, player, cardId, posId) => {
-        let opPlayer = player === "A" ? "B" : "A";
-        io.in(SID).emit('syncMonsterCard', opPlayer, cardId, 'op'+posId.substring(0,1).toUpperCase()+posId.substring(1));
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room, player) || typeof cardId !== 'string' || typeof posId !== 'string') return rejectAction(socket);
+        let opPlayer = otherPlayer(player);
+        io.in(room).emit('syncMonsterCard', opPlayer, cardId, 'op'+posId.substring(0,1).toUpperCase()+posId.substring(1));
     });
 
     socket.on('getOpponentHand', (SID, player) => {
-        let opPlayer = player === "A" ? "B" : "A";
-        io.in(SID).emit('opponentHandRequested', opPlayer);
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room, player)) return rejectAction(socket);
+        io.in(room).emit('opponentHandRequested', otherPlayer(player));
     });
     
     socket.on('opponentHandRevealed', (SID, opPlayer, cardsToReveal) => {
-        let player = opPlayer === "A" ? "B" : "A";
-        io.in(SID).emit('revealOpHandToPlayer', player, cardsToReveal);
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room, opPlayer) || !Array.isArray(cardsToReveal)) return rejectAction(socket);
+        io.in(room).emit('revealOpHandToPlayer', otherPlayer(opPlayer), cardsToReveal.slice(0, 3));
     });
     
     // Switches turn and passes on player choice to opponent 
     socket.on('switchTurn', (SID, cardIDs, posIDs, cardsInHand, abilityUsed) => {
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player) ||
+            !Array.isArray(cardIDs) || !Array.isArray(posIDs) || !Number.isInteger(cardsInHand) || typeof abilityUsed !== 'boolean') {
+            return rejectAction(socket);
+        }
         let switchedPosIDs = [];
         for (let i=0; i<posIDs.length; i++){
             // Amend capital and remove op if exists, else add op to string header
@@ -204,36 +255,42 @@ io.on('connection', (socket) => {
         }
         
         // Return turn to player if opponent has passed their turn, else switch turn
-        if (roomPassCount[SID] === 1){
-            io.in(SID).emit('returnTurn', cardIDs, switchedPosIDs, cardsInHand, abilityUsed);
+        if (roomPassCount[room] === 1){
+            roomTurn[room] = socket.player;
+            io.in(room).emit('returnTurn', cardIDs, switchedPosIDs, cardsInHand, abilityUsed);
         }
         else {
-            io.in(SID).emit('nextTurn', cardIDs, switchedPosIDs, cardsInHand, abilityUsed);
+            roomTurn[room] = otherPlayer(socket.player);
+            io.in(room).emit('nextTurn', cardIDs, switchedPosIDs, cardsInHand, abilityUsed);
         }
     });
     
     socket.on('endGame', (SID, player) => {
+        const room = roomId(SID);
+        if (!actionIsAuthorised(socket, room, player)) return rejectAction(socket);
         // Call only needs to be emit once to room
         if(player == 'A'){
-            io.in(SID).emit('results');
+            io.in(room).emit('results');
         }   
     });
 
     // Start a new match only when both players have explicitly opted in.
     socket.on('playAgain', (SID, player) => {
-        if (!(SID in rematchCheck)) rematchCheck[SID] = {};
-        rematchCheck[SID][player] = true;
+        const roomIdValue = roomId(SID);
+        if (!actionIsAuthorised(socket, roomIdValue, player)) return rejectAction(socket);
+        if (!(roomIdValue in rematchCheck)) rematchCheck[roomIdValue] = {};
+        rematchCheck[roomIdValue][player] = true;
 
-        if (rematchCheck[SID].A && rematchCheck[SID].B) {
-            delete rematchCheck[SID];
-            io.in(SID).emit('rematchReady');
+        if (rematchCheck[roomIdValue].A && rematchCheck[roomIdValue].B) {
+            delete rematchCheck[roomIdValue];
+            io.in(roomIdValue).emit('rematchReady');
 
             // Release both old sockets before their pages reload, so neither
             // reconnect is mistaken for a third player in a full room.
-            let room = io.sockets.adapter.rooms[''+SID];
+            let room = io.sockets.adapter.rooms[roomIdValue];
             if (room !== undefined) {
                 Object.keys(room.sockets).forEach((socketId) => {
-                    io.sockets.sockets[socketId].leave(SID);
+                    io.sockets.sockets[socketId].leave(roomIdValue);
                 });
             }
         }
