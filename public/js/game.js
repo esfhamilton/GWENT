@@ -8,8 +8,6 @@ const {SID, player} = Qs.parse(location.search, {
 });
 
 socket.emit('rejoinRequest', SID);
-socket.emit('getPlayerDeck', SID, player);
-socket.emit('startCheck', SID);
 
 const playAgainBtn = document.getElementById('playAgainBtn');
 playAgainBtn.addEventListener('click', () => {
@@ -30,6 +28,50 @@ socket.on('noDeck', () => {
 
 let factionId, leaderId, deck, index, firstTurn;
 let hand = [];
+
+// A refresh creates a new browser page and therefore a new Socket.IO client.
+// Keep the in-progress client state for this tab so reconnecting does not deal
+// a fresh hand or restart the setup barrier.
+const gameSnapshotKey = `gwent-game:${SID}:${player}`;
+const snapshotElementIds = [
+    'topMsg', 'topMsg2', 'playAgainBtn', 'pStats', 'oStats', 'pLeader', 'oLeader',
+    'pPass', 'oPass', 'pDeck', 'oDeck', 'pDisc', 'oDisc', 'hand', 'highlightedCards',
+    'weatherStats', 'combatLane', 'rangedLane', 'siegeLane', 'opCombatLane',
+    'opRangedLane', 'opSiegeLane', 'combatHorn', 'rangedHorn', 'siegeHorn',
+    'opCombatHorn', 'opRangedHorn', 'opSiegeHorn', 'cardSelected', 'cardDetailView',
+    'cardDetailInfo'
+];
+
+function readGameSnapshot() {
+    try {
+        const snapshot = JSON.parse(sessionStorage.getItem(gameSnapshotKey));
+        return snapshot && snapshot.version === 1 ? snapshot : null;
+    }
+    catch {
+        sessionStorage.removeItem(gameSnapshotKey);
+        return null;
+    }
+}
+
+function saveGameSnapshot() {
+    if (!factionId || !Array.isArray(deck) || !opFactionId || !Array.isArray(opponentDeck)) return;
+
+    const elements = {};
+    snapshotElementIds.forEach((id) => {
+        const element = document.getElementById(id);
+        elements[id] = { html: element.innerHTML, style: element.getAttribute('style') };
+    });
+
+    sessionStorage.setItem(gameSnapshotKey, JSON.stringify({
+        version: 1,
+        factionId, leaderId, deck, firstTurn, hand, opFactionId, opLeaderId, opponentDeck,
+        opponentHandSize, replaceCount, handChosen, myTurn, hadFirst, pLife, oLife,
+        discardPiles, doubledRows, weatherEffects, leaderAbilityUsed, passedTurn, gameEnded,
+        elements
+    }));
+}
+
+const restoredGameSnapshot = readGameSnapshot();
 socket.on('playerAssigned', (FID, leaderID, cards) => {
     factionId = FID;
     leaderId = leaderID;
@@ -1150,6 +1192,7 @@ socket.on('rematchWaiting', () => {
 });
 
 socket.on('rematchReady', () => {
+    sessionStorage.removeItem(gameSnapshotKey);
     window.location.reload();
 });
 
@@ -1528,3 +1571,46 @@ function cancelCardSelection() {
         document.getElementById('leaderInstructions').innerHTML = getLeaderInstructionText();
         document.getElementById('instructions').innerHTML = instructionTextHide;
 }
+
+function restoreGameSnapshot(snapshot) {
+    ({
+        factionId, leaderId, deck, firstTurn, hand, opFactionId, opLeaderId, opponentDeck,
+        opponentHandSize, replaceCount, handChosen, myTurn, hadFirst, pLife, oLife,
+        discardPiles, doubledRows, weatherEffects, leaderAbilityUsed, passedTurn, gameEnded
+    } = snapshot);
+
+    Object.entries(snapshot.elements).forEach(([id, saved]) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.innerHTML = saved.html;
+        if (saved.style === null) element.removeAttribute('style');
+        else element.setAttribute('style', saved.style);
+    });
+
+    // Do not resume a half-completed card-selection sequence after a reload.
+    cardSelectedFlag = false;
+    switchTurnLock = false;
+    releaseTurnLockOnEsc = false;
+    selectedCard = undefined;
+    document.getElementById('cardSelected').style.display = 'none';
+    document.getElementById('cardDetailView').style.display = 'none';
+    document.getElementById('cardDetailInfo').style.display = 'none';
+
+    document.getElementById('pLeaderContainer').setAttribute('onclick', "leaderSelected('"+leaderId+"')");
+    document.getElementById('oLeaderContainer').setAttribute('onclick', "leaderSelected('"+opLeaderId+"')");
+    setCardStyle('pDeck', factionId);
+    setCardStyle('oDeck', opFactionId);
+    grayscaleUsedLeaders();
+    document.addEventListener('keydown', keyPressed);
+    updatePowerValues();
+}
+
+if (restoredGameSnapshot) {
+    restoreGameSnapshot(restoredGameSnapshot);
+}
+else {
+    socket.emit('getPlayerDeck', SID, player);
+    socket.emit('startCheck', SID);
+}
+
+window.addEventListener('pagehide', saveGameSnapshot);
