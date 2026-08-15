@@ -8,27 +8,30 @@
         <title>GWENT</title>
     </head>
     <body>
-        <div style="display: flex; justify-content: space-around;">
-            <span><h1>Build your Deck</h1></span>
-            <div style="position: absolute; top:30%">
+        <main class="app-shell">
+            <h1 class="page-heading">Build your Deck</h1>
+            <div class="page-content panel deck-panel">
                 <p class="info" id="info">Select a Leader and click on the cards in the Available column below to add them to your deck. When you're ready press the Next button to continue.</p>
-                <div class="stickyPlaceholder">
-                    <button class="btn suggestDeckBtn" id="suggestDeckBtn" type="button" onclick="suggestDeck()">Suggest Deck</button>
-                    <p class="unitCardCount" id="unitCardCount">Unit Cards: 0/22</p>
+                <div class="deck-actions">
+                    <button class="btn btn-secondary suggestDeckBtn" id="suggestDeckBtn" type="button" onclick="suggestDeck()">Suggest Deck</button>
+                    <button class="btn" type="button" onclick="submit()">Next</button>
                 </div>
-                <button class="btn" onclick="submit()"><h2>Next</h2></button>
-                <h3>Leader</h3>
-                <br>
                 <div class="leaders" id="leaderSection">
+                    <h3>Leader</h3>
                 </div>
-                <div class="column" id="availableCards">
-                    <h3>Available</h3>
+                <div class="deck-progress">
+                    <p class="unitCardCount" id="unitCardCount" aria-live="polite">Unit Cards: 0/22</p>
                 </div>
-                <div class="column" id="currentDeck">
-                    <h3>Current Deck</h3>
+                <div class="deck-columns">
+                    <div class="column" id="availableCards">
+                        <h3>Available</h3>
+                    </div>
+                    <div class="column" id="currentDeck">
+                        <h3>Current Deck</h3>
+                    </div>
                 </div>
             </div>
-        </div>
+        </main>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qs/6.9.4/qs.min.js" 
                 integrity="sha256-ijqLssetA1NMNjZ+w1zaUafQQLm4IW5OoM8O+4tatME=" 
                 crossorigin="anonymous">

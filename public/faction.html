@@ -7,20 +7,20 @@
         <meta name="description" content="A browser based platform for playing the card game GWENT.">
         <link rel="stylesheet" href="css/style.css">
     </head>
-    <body>    
-        <div style="display: flex; justify-content: space-around;">
-            <span><h1>Choose your Faction</h1></span>
-            <div style="position: absolute; top: 37%;">
-                <select style="font-size: 175%;" name="faction" id="faction">
+    <body>
+        <main class="app-shell">
+            <h1 class="page-heading">Choose your Faction</h1>
+            <div class="page-content panel menu-panel">
+                <select name="faction" id="faction">
                     <option value="NR">Northern Realms</option>
                     <option value="NG">Nilfgaard</option>
                     <option value="ST">Scoia'Tael</option>
                     <option value="MO">Monsters</option>
                 </select>
-                <br><br>
-                <button class="btn" onclick="submit()"><h2>Next</h2></button>
+                <br>
+                <button class="btn" onclick="submit()">Next</button>
             </div>
-        </div>
+        </main>
         
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qs/6.9.4/qs.min.js" 
                 integrity="sha256-ijqLssetA1NMNjZ+w1zaUafQQLm4IW5OoM8O+4tatME=" 

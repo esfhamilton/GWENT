@@ -222,19 +222,3 @@ function submit() {
 socket.on('playerAssignment', (PID) => {
     location.replace(`${location.origin}/game.html?SID=${SID}&player=${PID}`);
 });
-
-var stickyContainer = $('.stickyPlaceholder');
-var origOffsetY = stickyContainer.offset().top;
-
-function onScroll() {
-    if(window.scrollY >= origOffsetY ){
-        stickyContainer.removeClass('stickyPlaceholder')
-        stickyContainer.addClass('sticky') 
-    }
-    else{
-        stickyContainer.removeClass('sticky');
-        stickyContainer.addClass('stickyPlaceholder')
-    }
-}
-
-$(document).on('scroll', onScroll);

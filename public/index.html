@@ -7,23 +7,22 @@
         <meta name="description" content="A browser based platform for playing the card game GWENT.">
         <link rel="stylesheet" href="css/style.css">
     </head>
-    <body>    
-        <div style="display: flex; justify-content: space-around;">
-            <span><h1>GWENT ONLINE</h1></span>
-            <div style="position: absolute; top:32%">
-                <form action="lobby.html">
-                    <button class="btn"><h2>CREATE ROOM</h2></button>
+    <body>
+        <main class="app-shell">
+            <h1 class="page-heading">GWENT Online</h1>
+            <div class="page-content panel menu-panel">
+                <form class="menu-form" action="lobby.html">
+                    <button class="btn">CREATE ROOM</button>
                 </form>
-                <form action="lobby.html">
-                    <button class="btn"><h2>JOIN GAME</h2></button>
-                    <br>
+                <form class="menu-form" action="lobby.html">
+                    <button class="btn">JOIN GAME</button>
                     <input pattern=".{5}" required title="5 Digit length" type="text" name="SID" placeholder="Enter Session ID" required>
                 </form>
             </div>
-        </div>
+            <footer class="page-footer">
+                <p>An unofficial fan work under the Gwent Fan Content Guidelines. Not approved or endorsed by CD PROJEKT RED.</p>
+                <p>Developed by esfhamilton</p>
+            </footer>
+        </main>
     </body>
-    <footer>
-        <p>An unofficial fan work under the Gwent Fan Content Guidelines. Not approved/endorsed by CD PROJEKT RED</p>
-        <p>Developed by esfhamilton</p>
-    </footer>
 </html>
