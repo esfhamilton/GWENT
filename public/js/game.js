@@ -37,6 +37,7 @@ let hand = [];
 // Keep the in-progress client state for this tab so reconnecting does not deal
 // a fresh hand or restart the setup barrier.
 const gameSnapshotKey = `gwent-game:${SID}:${player}`;
+let shouldSaveGameSnapshot = true;
 const snapshotElementIds = [
     'topMsg', 'topMsg2', 'playAgainBtn', 'pStats', 'oStats', 'pLeader', 'oLeader',
     'pPass', 'oPass', 'pDeck', 'oDeck', 'pDisc', 'oDisc', 'hand', 'highlightedCards',
@@ -58,6 +59,7 @@ function readGameSnapshot() {
 }
 
 function saveGameSnapshot() {
+    if (!shouldSaveGameSnapshot) return;
     if (!factionId || !Array.isArray(deck) || !opFactionId || !Array.isArray(opponentDeck)) return;
 
     const elements = {};
@@ -1196,6 +1198,9 @@ socket.on('rematchWaiting', () => {
 });
 
 socket.on('rematchReady', () => {
+    // A reload fires pagehide. Prevent that handler from immediately saving
+    // the finished match back into session storage after clearing it.
+    shouldSaveGameSnapshot = false;
     sessionStorage.removeItem(gameSnapshotKey);
     window.location.reload();
 });
