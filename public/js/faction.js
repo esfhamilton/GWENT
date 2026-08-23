@@ -9,22 +9,27 @@ SID = +Object.values(roomQuery);
 socket.emit('rejoinRequest', SID);
 
 const factionSelect = document.getElementById('faction');
+const perkFactionSelect = document.getElementById('perkFaction');
+const factionPerkChoice = document.getElementById('factionPerkChoice');
 const factionPerk = document.getElementById('factionPerk');
-const factionPerks = {
-    NR: 'Draw one extra card whenever you win a round.',
-    NG: 'Win rounds that end in a tie.',
-    ST: "Choose which player goes first at the start of the match.",
-    MO: 'Keep one random non-hero unit on the battlefield between rounds.'
-};
+const factionPerks = deckRules.factions.reduce((perks, faction) => {
+    perks[faction.id] = faction.perk;
+    return perks;
+}, {});
 
 function updateFactionPerk() {
-    factionPerk.textContent = factionPerks[factionSelect.value];
+    const isAllFaction = factionSelect.value === 'ALL';
+    factionPerkChoice.hidden = !isAllFaction;
+    const perkFaction = isAllFaction ? perkFactionSelect.value : factionSelect.value;
+    factionPerk.textContent = factionPerks[perkFaction];
 }
 
 factionSelect.addEventListener('change', updateFactionPerk);
+perkFactionSelect.addEventListener('change', updateFactionPerk);
 updateFactionPerk();
 
 function submit() {
-    const faction = document.getElementById('faction').value;
-    location.replace(`${location.origin}/deck.html?SID=${SID}&faction=${faction}`);
+    const faction = factionSelect.value;
+    const perkFaction = deckRules.getGameplayFaction(faction, perkFactionSelect.value);
+    location.replace(`${location.origin}/deck.html?SID=${SID}&faction=${faction}&perk=${perkFaction}`);
 }

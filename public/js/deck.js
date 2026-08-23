@@ -1,9 +1,15 @@
 const socket = io();
 
-// Get SID and faction ID from URL
-const {SID, faction} = Qs.parse(location.search, {
+// Get SID, deck faction, and selected perk from URL
+const {SID, faction, perk} = Qs.parse(location.search, {
     ignoreQueryPrefix: true
 })
+
+const deckFactionIds = deckRules.getDeckFactionIds(faction);
+const gameplayFaction = deckRules.getGameplayFaction(faction, perk);
+const leaderIds = deckRules.getLeaderIds(faction);
+const neutralCardIds = deckRules.getNeutralCardIds();
+const factionCardIds = deckRules.getFactionCardIds(faction);
 
 socket.emit('rejoinRequest', SID);
 
@@ -23,43 +29,44 @@ function setAbilityKeyOpen(isOpen) {
 abilityKeyBtn.addEventListener('click', () => setAbilityKeyOpen(abilityKey.hidden));
 abilityKeyClose.addEventListener('click', () => setAbilityKeyOpen(false));
 
-function createLeaderCard(i) {
+function createLeaderCard(leaderId) {
     let leaderCard = document.createElement('div');
     leaderCard.className = "leaderCard";
-    leaderCard.id = faction+"Leader"+i;
-    leaderCard.setAttribute('onmouseenter', "showAbility('ability"+i+"')");
-    leaderCard.setAttribute('onmouseleave', "hideAbility('ability"+i+"')");
+    leaderCard.id = leaderId;
+    const abilityId = leaderId + 'Ability';
+    leaderCard.setAttribute('onmouseenter', "showAbility('"+abilityId+"')");
+    leaderCard.setAttribute('onmouseleave', "hideAbility('"+abilityId+"')");
     leaderCard.setAttribute('onclick', "leaderSelected('"+leaderCard.id+"')");
     let abilityDesc = document.createElement('p');
     abilityDesc.className = "abilityDesc";
-    abilityDesc.id = "ability"+i;
-    abilityDesc.innerHTML = abilityDescriptions[faction+"Leader"+i];
+    abilityDesc.id = abilityId;
+    abilityDesc.innerHTML = abilityDescriptions[leaderId];
     leaderCard.appendChild(abilityDesc);
     return leaderCard;
 }
 
-function createNeutralCard(i, attribute, colNotation = "") {
+function createNeutralCard(cardId, attribute, colNotation = "") {
     let neutralCard = document.createElement('div');
     neutralCard.className = "card";
-    neutralCard.id = "neutral"+i+colNotation;
-    neutralCard.setAttribute('onclick', attribute+"('neutral"+i+"');")
+    neutralCard.id = cardId+colNotation;
+    neutralCard.setAttribute('onclick', attribute+"('"+cardId+"');")
     let cardAmount = document.createElement('p');
     cardAmount.className = "cardAmount";
-    cardAmount.id = "neutral"+i+"Amount"+colNotation;
-    cardAmount.innerHTML = "x"+cardsAvailable["neutral"+i];
+    cardAmount.id = cardId+"Amount"+colNotation;
+    cardAmount.innerHTML = "x"+cardsAvailable[cardId];
     neutralCard.appendChild(cardAmount);
     return neutralCard;
 }
 
-function createFactionCard(i, attribute, colNotation = "") {
+function createFactionCard(cardId, attribute, colNotation = "") {
     let factionCard = document.createElement('div');
     factionCard.className = "card";
-    factionCard.id = faction+i+colNotation;
-    factionCard.setAttribute('onclick', attribute+"('"+faction+i+"');")
+    factionCard.id = cardId+colNotation;
+    factionCard.setAttribute('onclick', attribute+"('"+cardId+"');")
     let cardAmount = document.createElement('p');
     cardAmount.className = "cardAmount";
-    cardAmount.id = faction+i+"Amount"+colNotation;
-    cardAmount.innerHTML = "x"+cardsAvailable[faction+i]; 
+    cardAmount.id = cardId+"Amount"+colNotation;
+    cardAmount.innerHTML = "x"+cardsAvailable[cardId];
     factionCard.appendChild(cardAmount);
     return factionCard;
 }
@@ -75,30 +82,29 @@ function addCardStyles() {
     }
 }
 
-const factionCardAmount = factionCardAmounts[faction];
 let leaderSection = document.getElementById('leaderSection');
 let availableColumn = document.getElementById('availableCards');
 let currentDeckColumn = document.getElementById('currentDeck');
 let deck = [];
 
-for(let i=1; i<=4; i++){
-    let leaderCard = createLeaderCard(i);
+leaderIds.forEach((leaderId) => {
+    let leaderCard = createLeaderCard(leaderId);
     leaderSection.appendChild(leaderCard);
-}
+});
 
-for(let i=1; i<=17; i++){
-    let neutralCard = createNeutralCard(i, 'addToDeck');
-    let neutralCardCD = createNeutralCard(i, 'removeFromDeck','CD');
+neutralCardIds.forEach((cardId) => {
+    let neutralCard = createNeutralCard(cardId, 'addToDeck');
+    let neutralCardCD = createNeutralCard(cardId, 'removeFromDeck','CD');
     availableColumn.appendChild(neutralCard);
     currentDeckColumn.appendChild(neutralCardCD);
-}
+});
 
-for(let i=1; i<=factionCardAmount; i++){
-    let factionCard = createFactionCard(i, 'addToDeck');
-    let factionCardCD = createFactionCard(i, 'removeFromDeck','CD');
+factionCardIds.forEach((cardId) => {
+    let factionCard = createFactionCard(cardId, 'addToDeck');
+    let factionCardCD = createFactionCard(cardId, 'removeFromDeck','CD');
     availableColumn.appendChild(factionCard);
     currentDeckColumn.appendChild(factionCardCD);
-}
+});
 
 addCardStyles();
 
@@ -119,10 +125,10 @@ function leaderSelected(id) {
 }
 
 function resetBorders() {
-    for(i=1; i<=4; i++){
-        document.getElementById(faction+"Leader"+i).style.borderStyle = "solid";
-        document.getElementById(faction+"Leader"+i).style.borderColor = "black";
-    }
+    leaderIds.forEach((leaderId) => {
+        document.getElementById(leaderId).style.borderStyle = "solid";
+        document.getElementById(leaderId).style.borderColor = "black";
+    });
 }
 
 function addToDeck(id) {
@@ -179,10 +185,10 @@ function getSuggestedUnitScore(cardId) {
     if (moraleBoosters.includes(cardId)) score += 18;
 
     // Preserve each faction's strongest intended play style when scores tie.
-    if (faction === 'NR' && tightBonds.includes(cardId)) score += 20;
-    if (faction === 'NG' && combatSpies.concat(siegeSpies).includes(cardId)) score += 20;
-    if (faction === 'ST' && (musterIds.includes(cardId) || moraleBoosters.includes(cardId))) score += 15;
-    if (faction === 'MO' && musterIds.includes(cardId)) score += 20;
+    if (gameplayFaction === 'NR' && tightBonds.includes(cardId)) score += 20;
+    if (gameplayFaction === 'NG' && combatSpies.concat(siegeSpies).includes(cardId)) score += 20;
+    if (gameplayFaction === 'ST' && (musterIds.includes(cardId) || moraleBoosters.includes(cardId))) score += 15;
+    if (gameplayFaction === 'MO' && musterIds.includes(cardId)) score += 20;
 
     return score;
 }
@@ -195,7 +201,9 @@ function suggestDeck() {
     clearDeck();
 
     const unitCandidates = Object.keys(cardsAvailable)
-        .filter((cardId) => unitCards.includes(cardId) && (cardId.startsWith(faction) || cardId.startsWith('neutral')))
+        .filter((cardId) => unitCards.includes(cardId) && (
+            cardId.startsWith('neutral') || deckFactionIds.some((factionId) => cardId.startsWith(factionId))
+        ))
         .sort((first, second) => getSuggestedUnitScore(second) - getSuggestedUnitScore(first) || first.localeCompare(second));
 
     // Add exactly 22 units, respecting every card's available copy count.
@@ -212,7 +220,7 @@ function suggestDeck() {
     };
 
     // A compact deterministic special-card package complements each faction's units.
-    factionSpecials[faction].forEach((cardId) => {
+    factionSpecials[gameplayFaction].forEach((cardId) => {
         if (cardsAvailable[cardId] > 0) addToDeck(cardId);
     });
 
@@ -228,7 +236,7 @@ function submit() {
             document.getElementById('info').innerHTML = "Your deck is weak. Add at least 22 unit cards before proceeding.";
         }
         else {
-            socket.emit('playerDeck',SID,leader,deck,faction);
+            socket.emit('playerDeck',SID,leader,deck,gameplayFaction);
         }
     }
 }

@@ -190,8 +190,6 @@ const styles = {
     MO39:{"background": "url(img/cards_04.jpg) 35.5% 94% / 455% 331%", "display": "block"} 
 };
 
-const factionCardAmounts = {"NR":28, "NG":30, "ST":37, "MO":39};            
-
 const abilityDescriptions = {
     "NRLeader1" : "Ability: Doubles the strength of all your Siege units (unless a Commander's Horn is also present on that row).",
     "NRLeader2" : "Ability: Pick an Impenetrable Fog card from your deck and play it instantly.",

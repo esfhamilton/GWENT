@@ -16,7 +16,17 @@
                     <option value="NG">Nilfgaard</option>
                     <option value="ST">Scoia'Tael</option>
                     <option value="MO">Monsters</option>
+                    <option value="ALL">All</option>
                 </select>
+                <div class="faction-perk-choice" id="factionPerkChoice" hidden>
+                    <label for="perkFaction">Choose your faction perk</label>
+                    <select name="perkFaction" id="perkFaction">
+                        <option value="NR">Northern Realms</option>
+                        <option value="NG">Nilfgaard</option>
+                        <option value="ST">Scoia'Tael</option>
+                        <option value="MO">Monsters</option>
+                    </select>
+                </div>
                 <p class="faction-perk" id="factionPerk" aria-live="polite"></p>
                 <button class="btn" onclick="submit()">Next</button>
             </div>
@@ -28,6 +38,7 @@
         </script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
         <script src="/socket.io/socket.io.js"></script>
+        <script src="js/deckRules.js"></script>
         <script src="js/faction.js"></script>
     </body>
 </html>
