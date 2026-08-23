@@ -163,14 +163,14 @@ function setup() {
 
 const grayscaleUsedLeaders = () => {
     if(leaderId === "NGLeader1" || opLeaderId === "NGLeader1"){
-        document.getElementById('pLeader').style = "filter: grayscale(90%);"
-        document.getElementById('oLeader').style = "filter: grayscale(90%);"
+        document.getElementById('pLeader').style.filter = "grayscale(90%)";
+        document.getElementById('oLeader').style.filter = "grayscale(90%)";
     }
     if (leaderId === "STLeader3") {
-        document.getElementById('pLeader').style = "filter: grayscale(90%);"
+        document.getElementById('pLeader').style.filter = "grayscale(90%)";
     }
     if (opLeaderId === "STLeader3"){
-        document.getElementById('oLeader').style = "filter: grayscale(90%);"
+        document.getElementById('oLeader').style.filter = "grayscale(90%)";
     }
 }
 
@@ -750,8 +750,8 @@ const drawCardOfChoice = ((cardId) => {
 async function useLeaderAbility(useOpponentLeaderAbility=false, cardIds=[]){
     switchTurnLock = false;
 
-    if(useOpponentLeaderAbility) document.getElementById('oLeader').style = "filter: grayscale(90%);"
-    else document.getElementById('pLeader').style = "filter: grayscale(90%);"
+    if(useOpponentLeaderAbility) document.getElementById('oLeader').style.filter = "grayscale(90%)";
+    else document.getElementById('pLeader').style.filter = "grayscale(90%)";
     setCardStyle('pLeader', leaderId);
     setCardStyle('oLeader', opLeaderId);
 
@@ -1667,6 +1667,8 @@ function restoreGameSnapshot(snapshot) {
 
     document.getElementById('pLeaderContainer').setAttribute('onclick', "leaderSelected('"+leaderId+"')");
     document.getElementById('oLeaderContainer').setAttribute('onclick', "leaderSelected('"+opLeaderId+"')");
+    setCardStyle('pLeader', leaderId);
+    setCardStyle('oLeader', opLeaderId);
     setCardStyle('pDeck', factionId);
     setCardStyle('oDeck', opFactionId);
     grayscaleUsedLeaders();
