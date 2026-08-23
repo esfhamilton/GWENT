@@ -1636,6 +1636,16 @@ function cancelCardSelection() {
         document.getElementById('instructions').innerHTML = instructionTextHide;
 }
 
+function restoreControlInstructions() {
+    const showControls = handChosen && !gameEnded;
+    document.getElementById('leaderInstructions').innerHTML = showControls
+        ? getLeaderInstructionText()
+        : '';
+    document.getElementById('instructions').innerHTML = showControls
+        ? instructionTextHide
+        : '';
+}
+
 function restoreGameSnapshot(snapshot) {
     ({
         factionId, leaderId, deck, firstTurn, hand, opFactionId, opLeaderId, opponentDeck,
@@ -1664,6 +1674,7 @@ function restoreGameSnapshot(snapshot) {
     document.getElementById('cardSelected').style.display = 'none';
     document.getElementById('cardDetailView').style.display = 'none';
     document.getElementById('cardDetailInfo').style.display = 'none';
+    restoreControlInstructions();
 
     document.getElementById('pLeaderContainer').setAttribute('onclick', "leaderSelected('"+leaderId+"')");
     document.getElementById('oLeaderContainer').setAttribute('onclick', "leaderSelected('"+opLeaderId+"')");
