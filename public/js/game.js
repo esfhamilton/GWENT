@@ -1413,18 +1413,15 @@ function putCardOnBoard(boardPosId) {
     if(!weatherEffects.includes(selectedCard)) createCard(selectedCard, posId, '', 'cardSmall');
 }
 
-// Counts nonhero cards in each row for moralebooster
-let boostableCards;
 function getPowerModifiers() {
     
     // Reset modifier placeholders
-    tightBondMods = moraleMods = $.extend(true,{},modBase);
-    boostableCards = [0,0,0,0,0,0];
+    tightBondMods = $.extend(true,{},modBase);
+    moraleMods = $.extend(true,{},modBase);
     
     // Iterate through each of the player's rows
     let cardID;
     let cardsInRow;
-    let rowIndex = 0;
     rowIds.forEach((row) =>{
         cardsInRow = $('.'+row).find('.cardSmall').length;
         for(let i=0; i<cardsInRow; i++){
@@ -1436,13 +1433,8 @@ function getPowerModifiers() {
             if (moraleBoosters.includes(cardID)){
                 moraleMods[row][cardID] ??= 0;
                 moraleMods[row][cardID] += 1;
-                if(!heroes.includes(cardID)) boostableCards[rowIndex] -= 1;
-            }
-            if(!heroes.includes(cardID) && cardID !== decoy){
-                boostableCards[rowIndex] += 1;
             }
         }
-        rowIndex += 1;
     });
 }
 
@@ -1460,30 +1452,18 @@ async function updatePowerValues() {
     getPowerModifiers();
 
     // Calculate power values for each row
-    let rowIndex = 0;
     rowIds.forEach((row) =>{
         let rowPowerValueId = row.substring(0,row.length-4)+"Power";
         let cardsInRow = $('.'+row).find('.cardSmall').length;
-        let hornInRow = $('.'+row.slice(0,-4).concat("Horn")).find('.cardSmall')[0];
         for(let i=0; i<cardsInRow; i++){
             let cardId = $('.'+row).find('.cardSmall')[i].id;
             let basePower = getBasePower(cardId, row);
-            if(!heroes.includes(cardId) && (hornInRow !== undefined || doubledRows.includes(row))){
-                powerLevels[rowPowerValueId] += basePower * (tightBondMods[row][cardId] ?? 1);
-
-                if(moraleBoosters.includes(cardId)) powerLevels[rowPowerValueId] += boostableCards[rowIndex];
-                if(dandelion === cardId && hornInRow === undefined) powerLevels[rowPowerValueId] -= basePower;
-            }
-            
-            if(moraleBoosters.includes(cardId)){ 
-                powerLevels[rowPowerValueId] += boostableCards[rowIndex];
-            }
-
-            powerLevels[rowPowerValueId] += basePower * (tightBondMods[row][cardId] ?? 1);    
+            powerLevels[rowPowerValueId] += heroes.includes(cardId)
+                ? basePower
+                : getCurrentCardPower(cardId, row);
         }
         
         document.getElementById(rowPowerValueId).innerHTML = powerLevels[rowPowerValueId]; 
-        rowIndex += 1;
     });
     
     powerLevels["totalPower"] = powerLevels["combatPower"] + powerLevels["rangedPower"] + powerLevels["siegePower"];
@@ -1496,24 +1476,28 @@ async function updatePowerValues() {
 
 // Return the same contribution a non-hero unit makes to its row total. This
 // keeps the on-card indicator in lockstep with the existing scoring rules.
-function getCurrentCardPower(cardId, row, rowIndex) {
+function getCurrentCardPower(cardId, row) {
     const basePower = getBasePower(cardId, row);
     const bondMultiplier = tightBondMods[row][cardId] ?? 1;
     const hornInRow = $('.' + row.slice(0, -4).concat('Horn')).find('.cardSmall')[0];
-    let currentPower = basePower * bondMultiplier;
+    const moraleBoost = moraleBoosters.reduce(
+        (total, moraleCard) => total + (moraleMods[row][moraleCard] ?? 0),
+        moraleBoosters.includes(cardId) ? -1 : 0
+    );
+    let currentPower = basePower * bondMultiplier + moraleBoost;
 
     if (hornInRow !== undefined || doubledRows.includes(row)) {
-        currentPower += basePower * bondMultiplier;
-        if (moraleBoosters.includes(cardId)) currentPower += boostableCards[rowIndex];
-        if (dandelion === cardId && hornInRow === undefined) currentPower -= basePower;
+        currentPower += basePower * bondMultiplier + moraleBoost;
+        if (dandelion === cardId && hornInRow === undefined) {
+            currentPower -= basePower * bondMultiplier + moraleBoost;
+        }
     }
 
-    if (moraleBoosters.includes(cardId)) currentPower += boostableCards[rowIndex];
     return currentPower;
 }
 
 function updateBattlefieldCardPowerBadges() {
-    rowIds.forEach((row, rowIndex) => {
+    rowIds.forEach((row) => {
         $('.' + row).find('.cardSmall').each(function () {
             const cardId = this.id;
             const existingBadge = this.querySelector('.cardPowerBadge');
@@ -1523,7 +1507,7 @@ function updateBattlefieldCardPowerBadges() {
                 return;
             }
 
-            const currentPower = getCurrentCardPower(cardId, row, rowIndex);
+            const currentPower = getCurrentCardPower(cardId, row);
             if (currentPower === cardPowers[cardId]) {
                 if (existingBadge) existingBadge.remove();
                 return;
