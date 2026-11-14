@@ -21,6 +21,7 @@ const ROOM_CLEANUP_DELAY_MS = 30000;
 
 const roomId = (SID) => String(SID);
 const otherPlayer = (player) => player === 'A' ? 'B' : 'A';
+const validStrings = (value, max = 150) => Array.isArray(value) && value.length <= max && value.every(item => typeof item === 'string' && item.length <= 100);
 
 function actionIsAuthorised(socket, SID, player = socket.player) {
     const room = roomId(SID);
@@ -152,6 +153,8 @@ io.on('connection', (socket) => {
     // Gets player details from client and stores them on server
     socket.on('playerDeck', (SID, leader, deck, faction) => {
         const room = roomId(SID);
+        if (!hasOpenRoom(room) || !socket.rooms[room] || typeof leader !== 'string' || leader.length > 100 ||
+            typeof faction !== 'string' || faction.length > 100 || !validStrings(deck)) return rejectAction(socket);
         let playerA = room +'A';
         let playerB = room +'B';
 
@@ -209,21 +212,15 @@ io.on('connection', (socket) => {
         const room = roomId(SID);
         if (!actionIsAuthorised(socket, room, player)) return rejectAction(socket);
         if(!(room in roomFirstTurn)) roomFirstTurn[room] = Math.random()>0.5 ? 'A':'B';
-        let OID;
-        if (player === 'A') {
-            OID = room + 'B';
-            socket.emit('opponentDeck', gameData[OID]["faction"], gameData[OID]["leader"], gameData[OID]["deck"]);
-        }
-        else {
-            OID = room + 'A';
-            socket.emit('opponentDeck', gameData[OID]["faction"], gameData[OID]["leader"], gameData[OID]["deck"]); 
-        }
+        const opponent = gameData[room + otherPlayer(player)];
+        if (!opponent) return rejectAction(socket);
+        socket.emit('opponentDeck', opponent.faction, opponent.leader, opponent.deck);
     });
     
     // Checks if players have redrawn the starting hand
     socket.on('cardsRedrawn', (SID, player, deck, firstTurn) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, player) || !Array.isArray(deck)) return rejectAction(socket);
+        if (!actionIsAuthorised(socket, room, player) || !validStrings(deck) || !gameData[room + player]) return rejectAction(socket);
         gameData[room + player]["deck"] = deck;
         if(firstTurn === 'A' || firstTurn === 'B') roomFirstTurn[room] = firstTurn;
         if(room in redrawnCheck) {
@@ -283,7 +280,7 @@ io.on('connection', (socket) => {
     
     socket.on('opponentHandRevealed', (SID, opPlayer, cardsToReveal) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, opPlayer) || !Array.isArray(cardsToReveal)) return rejectAction(socket);
+        if (!actionIsAuthorised(socket, room, opPlayer) || !validStrings(cardsToReveal)) return rejectAction(socket);
         io.in(room).emit('revealOpHandToPlayer', otherPlayer(opPlayer), cardsToReveal.slice(0, 3));
     });
     
@@ -291,7 +288,7 @@ io.on('connection', (socket) => {
     socket.on('switchTurn', (SID, cardIDs, posIDs, cardsInHand, abilityUsed) => {
         const room = roomId(SID);
         if (!actionIsAuthorised(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player) ||
-            !Array.isArray(cardIDs) || !Array.isArray(posIDs) || !Number.isInteger(cardsInHand) || typeof abilityUsed !== 'boolean') {
+            !validStrings(cardIDs) || !validStrings(posIDs) || !Number.isInteger(cardsInHand) || cardsInHand < 0 || cardsInHand > 150 || typeof abilityUsed !== 'boolean') {
             return rejectAction(socket);
         }
         let switchedPosIDs = [];
