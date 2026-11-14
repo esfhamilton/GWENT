@@ -6,7 +6,10 @@ const roomQuery = Qs.parse(location.search, {
 })
 
 SID = +Object.values(roomQuery);
-socket.emit('rejoinRequest', SID);
+socket.on('connect', () => socket.emit('rejoinRequest', SID, sessionStorage.getItem(`gwent-token:${SID}`)));
+socket.on('invalidRoom', () => { document.body.textContent = 'This room has expired or your session is invalid.'; });
+socket.on('roomExpired', () => { document.body.textContent = 'This room has expired.'; });
+socket.on('sessionReplaced', () => { document.body.textContent = 'This session was opened in another connection.'; });
 
 const factionSelect = document.getElementById('faction');
 const perkFactionSelect = document.getElementById('perkFaction');

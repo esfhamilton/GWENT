@@ -7,7 +7,16 @@ const {SID, player} = Qs.parse(location.search, {
     ignoreQueryPrefix: true
 });
 
-socket.emit('rejoinRequest', SID);
+socket.on('connect', () => {
+    socket.emit('rejoinRequest', SID, sessionStorage.getItem(`gwent-token:${SID}`));
+    if (restoredGameSnapshot || hasConnectedBefore) socket.emit('resumePlayer', SID, player);
+    else { socket.emit('getPlayerDeck', SID, player); socket.emit('startCheck', SID); }
+    hasConnectedBefore = true;
+});
+let hasConnectedBefore = false;
+socket.on('invalidRoom', () => { document.getElementById('topMsg').textContent = 'This room has expired or your session is invalid.'; });
+socket.on('roomExpired', () => { document.getElementById('topMsg').textContent = 'This room has expired.'; });
+socket.on('sessionReplaced', () => { document.getElementById('topMsg').textContent = 'This session was opened in another connection.'; });
 
 const playAgainBtn = document.getElementById('playAgainBtn');
 playAgainBtn.addEventListener('click', () => {
@@ -1689,11 +1698,6 @@ function restoreGameSnapshot(snapshot) {
 
 if (restoredGameSnapshot) {
     restoreGameSnapshot(restoredGameSnapshot);
-    socket.emit('resumePlayer', SID, player);
-}
-else {
-    socket.emit('getPlayerDeck', SID, player);
-    socket.emit('startCheck', SID);
 }
 
 window.addEventListener('pagehide', saveGameSnapshot);

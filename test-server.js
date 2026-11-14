@@ -22,8 +22,10 @@ async function main() {
     let reply = event(a, 'invalidAction');
     a.emit('playerDeck', '12345', 'leader', [], 'faction');
     await reply;
+    const credentials = event(a, 'roomCredentials');
     reply = event(a, 'validRoom'); a.emit('createRequest');
     const [room] = await reply;
+    const [, , token] = await credentials;
     reply = event(a, 'invalidAction'); a.emit('playerDeck', room, 'leader', {}, 'faction'); await reply;
     reply = event(a, 'playerAssignment'); a.emit('playerDeck', room, 'leader', ['card'], 'faction');
     assert.strictEqual((await reply)[0], 'A');
@@ -36,8 +38,9 @@ async function main() {
     a.close();
     await new Promise(resolve => setTimeout(resolve, 100));
     reply = event(b, 'invalidRoom'); b.emit('joinRequest', room); await reply;
-    b.emit('rejoinRequest', room);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    reply = event(b, 'invalidRoom'); b.emit('rejoinRequest', room, 'wrong'); await reply;
+    reply = event(b, 'rejoined'); b.emit('rejoinRequest', room, token);
+    assert.strictEqual((await reply)[1], 'A');
     reply = event(b, 'roomsFull'); b.emit('createRequest'); await reply;
     b.close();
     await new Promise(resolve => setTimeout(resolve, 600));

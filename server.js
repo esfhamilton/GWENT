@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 5000; 
 
@@ -21,6 +22,7 @@ const ROOM_CLEANUP_DELAY_MS = Number(process.env.ROOM_CLEANUP_DELAY_MS) || 30000
 const ROOM_IDLE_MS = Number(process.env.ROOM_IDLE_MS) || 2 * 60 * 60 * 1000;
 const ROOM_CAPACITY = Math.min(Number(process.env.ROOM_CAPACITY) || 89999, 89999);
 let roomIdleTimers = {};
+let roomTokens = {};
 
 const roomId = (SID) => String(SID);
 const otherPlayer = (player) => player === 'A' ? 'B' : 'A';
@@ -47,12 +49,30 @@ function addOpenRoom(SID) {
     return room;
 }
 
+function bindPlayer(socket, room, player) {
+    const members = io.sockets.adapter.rooms[room];
+    if (members) Object.keys(members.sockets).forEach(id => {
+        const old = io.sockets.sockets[id];
+        if (old !== socket && old.player === player && old.roomId === room) {
+            old.leave(room);
+            old.roomId = undefined;
+            old.player = undefined;
+            old.emit('sessionReplaced');
+        }
+    });
+    socket.join(room);
+    socket.roomId = room;
+    socket.player = player;
+    touchRoom(room);
+}
+
 function cleanupRoom(SID) {
     const room = roomId(SID);
     openRooms.delete(room);
     clearTimeout(roomCleanupTimers[room]);
     clearTimeout(roomIdleTimers[room]);
     delete roomIdleTimers[room];
+    delete roomTokens[room];
     io.in(room).emit('roomExpired');
     const members = io.sockets.adapter.rooms[room];
     if (members) Object.keys(members.sockets).forEach(id => io.sockets.sockets[id].leave(room));
@@ -107,26 +127,16 @@ io.on('connection', (socket) => {
         if (socket.roomId) touchRoom(socket.roomId);
         next();
     });
-    socket.on('joinRequest', (SID) => {                
+    socket.on('joinRequest', (SID) => {
         const room = roomId(SID);
-        var numClients = io.sockets.adapter.rooms[room];
-        if (!numClients) {
-            // Preserve a room while its participants are reconnecting.
-            socket.emit('invalidRoom', SID);
-            return;
-        }
-        if (numClients.length < 2){
-                // Authorise join request
-                socket.join(room);
-                touchRoom(room);
-                // Emits to both (all) users in SID 
-                io.in(room).emit('continue', SID);
-        } 
-        else {
-            socket.emit('full', SID);
-        }
+        if (!hasOpenRoom(room) || !io.sockets.adapter.rooms[room]) return socket.emit('invalidRoom', SID);
+        if (roomTokens[room].B) return socket.emit('full', SID);
+        roomTokens[room].B = crypto.randomBytes(24).toString('hex');
+        bindPlayer(socket, room, 'B');
+        socket.emit('roomCredentials', room, 'B', roomTokens[room].B);
+        io.in(room).emit('continue', SID);
     });
-    
+
     socket.on('createRequest', () => {
         if (openRooms.size >= ROOM_CAPACITY) return socket.emit('roomsFull');
         const first = Math.floor(Math.random() * ROOM_CAPACITY);
@@ -141,62 +151,41 @@ io.on('connection', (socket) => {
             clearTimeout(roomCleanupTimers[room]);
             delete roomCleanupTimers[room];
         }
-        socket.join(room);
-        touchRoom(room);
+        roomTokens[room] = { A: crypto.randomBytes(24).toString('hex') };
+        bindPlayer(socket, room, 'A');
+        socket.emit('roomCredentials', room, 'A', roomTokens[room].A);
         socket.emit('validRoom', SID);
     });
     
     // Reconnects user to room with each new page
-    socket.on('rejoinRequest', (SID) => {         
+    socket.on('rejoinRequest', (SID, token) => {
         const room = roomId(SID);
-        if (!hasOpenRoom(room) && !gameData[room + 'A'] && !gameData[room + 'B']) {
-            socket.emit('invalidRoom', SID);
-            return;
-        }
-        addOpenRoom(room);
-        var numClients = io.sockets.adapter.rooms[room];
-        if (roomCleanupTimers[room]) {
-            clearTimeout(roomCleanupTimers[room]);
-            delete roomCleanupTimers[room];
-        }
-        // Keep the room listed even if both clients are currently reloading.
-        if (numClients === undefined || numClients.length < 2){
-            socket.join(room);
-            touchRoom(room);
-        }
-        else {
-            socket.emit('full', SID);
-        }       
+        const tokens = roomTokens[room];
+        const player = tokens && typeof token === 'string' && ['A', 'B'].find(p => tokens[p] && tokens[p] === token);
+        if (!hasOpenRoom(room) || !player) return socket.emit('invalidRoom', SID);
+        clearTimeout(roomCleanupTimers[room]);
+        delete roomCleanupTimers[room];
+        bindPlayer(socket, room, player);
+        socket.emit('rejoined', room, player);
     });
-    
+
     // Gets player details from client and stores them on server
     socket.on('playerDeck', (SID, leader, deck, faction) => {
         const room = roomId(SID);
         if (!hasOpenRoom(room) || !socket.rooms[room] || typeof leader !== 'string' || leader.length > 100 ||
             typeof faction !== 'string' || faction.length > 100 || !validStrings(deck)) return rejectAction(socket);
-        let playerA = room +'A';
-        let playerB = room +'B';
 
-        // Check if first player has already been added
-        if (playerA in gameData) {
-            // Add data under player B
-            gameData[playerB] = {"faction":faction,"leader":leader,"deck":deck,"hand":[],"discarded":[], "fullDeck": deck};
-            // Inform client which identifier their data is stored under
-            socket.emit('playerAssignment', 'B');
-        }
-        else {
-            // Add data under player A
-            gameData[playerA] = {"faction":faction,"leader":leader,"deck":deck,"hand":[],"discarded":[], "fullDeck": deck};
-            // Inform client which identifier their data is stored under
-            socket.emit('playerAssignment', 'A');
-        }
+        if (!actionIsAuthorised(socket, room)) return rejectAction(socket);
+        const PID = room + socket.player;
+        if (gameData[PID]) return rejectAction(socket);
+        gameData[PID] = { faction, leader, deck: deck.slice(), hand: [], discarded: [], fullDeck: deck.slice() };
+        socket.emit('playerAssignment', socket.player);
     });
     
     // Returns corresponding deck to the player
     socket.on('getPlayerDeck', (SID, player) => {
         const room = roomId(SID);
-        if ((socket.player && (socket.roomId !== room || socket.player !== player)) ||
-            !socket.rooms || !socket.rooms[room] || (player !== 'A' && player !== 'B')) {
+        if (!actionIsAuthorised(socket, room, player)) {
             rejectAction(socket);
             return;
         }
@@ -275,9 +264,7 @@ io.on('connection', (socket) => {
     // newly shuffled deck or participating in the start-game barrier again.
     socket.on('resumePlayer', (SID, player) => {
         const room = roomId(SID);
-        if ((socket.player && (socket.roomId !== room || socket.player !== player)) ||
-            !socket.rooms || !socket.rooms[room] || (player !== 'A' && player !== 'B') ||
-            !gameData[room + player]) {
+        if (!actionIsAuthorised(socket, room, player) || !gameData[room + player]) {
             return rejectAction(socket);
         }
         socket.roomId = room;
