@@ -2,7 +2,7 @@ const assert = require('assert');
 const { spawn } = require('child_process');
 const io = require('socket.io-client');
 const port = 56000 + Math.floor(Math.random() * 1000);
-const child = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port) }, stdio: 'inherit' });
+const child = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port), ROOM_CAPACITY: '1', ROOM_CLEANUP_DELAY_MS: '400', ROOM_IDLE_MS: '10000' }, stdio: 'inherit' });
 const clients = [];
 function event(socket, name) {
     return new Promise((resolve, reject) => {
@@ -31,7 +31,20 @@ async function main() {
     reply = event(a, 'invalidAction'); a.emit('getOpponentDeck', room, 'A'); await reply;
     reply = event(a, 'invalidAction'); a.emit('switchTurn', room, [], [null], 1, false); await reply;
     assert.strictEqual(child.exitCode, null, 'server survives malformed events');
-    console.log('Socket validation tests passed');
+    const b = await connect();
+    reply = event(b, 'roomsFull'); b.emit('createRequest'); await reply;
+    a.close();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    reply = event(b, 'invalidRoom'); b.emit('joinRequest', room); await reply;
+    b.emit('rejoinRequest', room);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    reply = event(b, 'roomsFull'); b.emit('createRequest'); await reply;
+    b.close();
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const c = await connect();
+    reply = event(c, 'validRoom'); c.emit('createRequest');
+    assert.strictEqual((await reply)[0], room, 'empty room ID is released after grace period');
+    console.log('Socket validation and room lifecycle tests passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
     clients.forEach(socket => socket.close()); child.kill();

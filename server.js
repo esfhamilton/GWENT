@@ -8,7 +8,7 @@ server = app.listen(PORT);
 
 const io = require('socket.io')(server);
 
-let openRooms = [];
+let openRooms = new Set();
 let startCheck = {};
 let gameData = {};
 let redrawnCheck = {};
@@ -17,7 +17,10 @@ let roomFirstTurn = {};
 let rematchCheck = {};
 let roomTurn = {};
 let roomCleanupTimers = {};
-const ROOM_CLEANUP_DELAY_MS = 30000;
+const ROOM_CLEANUP_DELAY_MS = Number(process.env.ROOM_CLEANUP_DELAY_MS) || 30000;
+const ROOM_IDLE_MS = Number(process.env.ROOM_IDLE_MS) || 2 * 60 * 60 * 1000;
+const ROOM_CAPACITY = Math.min(Number(process.env.ROOM_CAPACITY) || 89999, 89999);
+let roomIdleTimers = {};
 
 const roomId = (SID) => String(SID);
 const otherPlayer = (player) => player === 'A' ? 'B' : 'A';
@@ -35,18 +38,24 @@ function rejectAction(socket) {
 
 function hasOpenRoom(SID) {
     const room = roomId(SID);
-    return openRooms.some((openRoom) => roomId(openRoom) === room);
+    return openRooms.has(room);
 }
 
 function addOpenRoom(SID) {
     const room = roomId(SID);
-    if (!hasOpenRoom(room)) openRooms.push(room);
+    openRooms.add(room);
     return room;
 }
 
 function cleanupRoom(SID) {
     const room = roomId(SID);
-    openRooms = openRooms.filter((openRoom) => roomId(openRoom) !== room);
+    openRooms.delete(room);
+    clearTimeout(roomCleanupTimers[room]);
+    clearTimeout(roomIdleTimers[room]);
+    delete roomIdleTimers[room];
+    io.in(room).emit('roomExpired');
+    const members = io.sockets.adapter.rooms[room];
+    if (members) Object.keys(members.sockets).forEach(id => io.sockets.sockets[id].leave(room));
     delete startCheck[room + 'A'];
     delete startCheck[room + 'B'];
     delete redrawnCheck[room];
@@ -58,6 +67,13 @@ function cleanupRoom(SID) {
         if (PID === room + 'A' || PID === room + 'B') delete gameData[PID];
     });
     delete roomCleanupTimers[room];
+}
+
+function touchRoom(SID) {
+    const room = roomId(SID);
+    if (!hasOpenRoom(room)) return;
+    clearTimeout(roomIdleTimers[room]);
+    roomIdleTimers[room] = setTimeout(() => cleanupRoom(room), ROOM_IDLE_MS);
 }
 
 function scheduleRoomCleanup(SID) {
@@ -87,18 +103,22 @@ function shuffle(deck) {
 }
 
 io.on('connection', (socket) => {
+    socket.use((packet, next) => {
+        if (socket.roomId) touchRoom(socket.roomId);
+        next();
+    });
     socket.on('joinRequest', (SID) => {                
         const room = roomId(SID);
         var numClients = io.sockets.adapter.rooms[room];
         if (!numClients) {
-            // A stale openRooms entry must not be treated as a live room.
-            cleanupRoom(room);
+            // Preserve a room while its participants are reconnecting.
             socket.emit('invalidRoom', SID);
             return;
         }
         if (numClients.length < 2){
                 // Authorise join request
                 socket.join(room);
+                touchRoom(room);
                 // Emits to both (all) users in SID 
                 io.in(room).emit('continue', SID);
         } 
@@ -108,15 +128,12 @@ io.on('connection', (socket) => {
     });
     
     socket.on('createRequest', () => {
-        // Generates random 5 digit SID 
-        let SID = Math.floor(Math.random() * 89999) + 10000; 
-        // Ensures new SID generated is not already in openRooms
-        if (hasOpenRoom(SID)){
-            let repeat = true;
-            while(repeat){
-                SID = Math.floor(Math.random() * 89999) + 10000;
-                repeat = hasOpenRoom(SID);
-            }
+        if (openRooms.size >= ROOM_CAPACITY) return socket.emit('roomsFull');
+        const first = Math.floor(Math.random() * ROOM_CAPACITY);
+        let SID;
+        for (let offset = 0; offset < ROOM_CAPACITY; offset++) {
+            const candidate = 10000 + (first + offset) % ROOM_CAPACITY;
+            if (!hasOpenRoom(candidate)) { SID = candidate; break; }
         }
         // Join room and add corresponding SID to openRooms
         const room = addOpenRoom(SID);
@@ -125,6 +142,7 @@ io.on('connection', (socket) => {
             delete roomCleanupTimers[room];
         }
         socket.join(room);
+        touchRoom(room);
         socket.emit('validRoom', SID);
     });
     
@@ -144,6 +162,7 @@ io.on('connection', (socket) => {
         // Keep the room listed even if both clients are currently reloading.
         if (numClients === undefined || numClients.length < 2){
             socket.join(room);
+            touchRoom(room);
         }
         else {
             socket.emit('full', SID);

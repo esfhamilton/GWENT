@@ -37,3 +37,5 @@ socket.on("invalidRoom", (SID) => {
     lobbyMsg.innerHTML = `ERROR: Room ${SID} is an invalid room, please check the session ID has been entered correctly.`;
 });
 
+
+socket.on('roomsFull', () => { lobbyMsg.textContent = 'All rooms are currently in use. Please try again later.'; });
