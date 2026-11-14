@@ -18,6 +18,19 @@ socket.on('invalidRoom', () => { document.getElementById('topMsg').textContent =
 socket.on('roomExpired', () => { document.getElementById('topMsg').textContent = 'This room has expired.'; });
 socket.on('sessionReplaced', () => { document.getElementById('topMsg').textContent = 'This session was opened in another connection.'; });
 
+// Stop local interaction while either participant is offline.
+const connectionOverlay = document.createElement('div');
+connectionOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);color:white;display:none;align-items:center;justify-content:center;font-size:1.3rem;text-align:center';
+connectionOverlay.textContent = 'Connection interrupted. Waiting for both players to reconnect...';
+document.body.appendChild(connectionOverlay);
+function setConnectionPaused(paused) { connectionOverlay.style.display = paused ? 'flex' : 'none'; }
+socket.on('disconnect', () => setConnectionPaused(true));
+socket.on('playerDisconnected', () => setConnectionPaused(true));
+socket.on('playersConnected', () => setConnectionPaused(false));
+socket.on('invalidRoom', () => { connectionOverlay.textContent = 'This room has expired or your session is invalid.'; setConnectionPaused(true); });
+socket.on('roomExpired', () => { connectionOverlay.textContent = 'This room has expired.'; setConnectionPaused(true); });
+socket.on('sessionReplaced', () => { connectionOverlay.textContent = 'This session was opened in another connection.'; setConnectionPaused(true); });
+
 const playAgainBtn = document.getElementById('playAgainBtn');
 playAgainBtn.addEventListener('click', () => {
     playAgainBtn.disabled = true;
@@ -1547,6 +1560,7 @@ const getLeaderInstructionText = () =>
 
 let [handHiddenFlag,cardSelectedFlag,switchTurnLock,releaseTurnLockOnEsc,passedTurn,leaderAbilityUsed,gameEnded] = Array(6).fill(false);
 function keyPressed(event) {
+    if (connectionOverlay.style.display !== 'none') return;
     if(!gameEnded){
         // Enter 
         if (event.keyCode === 13 && !handChosen){

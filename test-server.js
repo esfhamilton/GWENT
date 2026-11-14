@@ -47,7 +47,20 @@ async function main() {
     const c = await connect();
     reply = event(c, 'validRoom'); c.emit('createRequest');
     assert.strictEqual((await reply)[0], room, 'empty room ID is released after grace period');
-    console.log('Socket validation and room lifecycle tests passed');
+    const d = await connect();
+    const dCredentials = event(d, 'roomCredentials');
+    reply = event(d, 'continue'); d.emit('joinRequest', room); await reply;
+    const [, , dToken] = await dCredentials;
+    reply = event(c, 'playerAssignment'); c.emit('playerDeck', room, 'leader', ['card'], 'faction'); await reply;
+    const present = event(c, 'playersConnected');
+    reply = event(d, 'playerAssignment'); d.emit('playerDeck', room, 'leader', ['card'], 'faction'); await reply; await present;
+    reply = event(c, 'playerDisconnected'); d.close(); await reply;
+    reply = event(c, 'invalidAction'); c.emit('passTurn', room); await reply;
+    const e = await connect();
+    const restored = event(c, 'playersConnected');
+    reply = event(e, 'rejoined'); e.emit('rejoinRequest', room, dToken); await reply; await restored;
+    reply = event(c, 'passedTurn'); c.emit('passTurn', room); await reply;
+    console.log('Socket validation, lifecycle and reconnect tests passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
     clients.forEach(socket => socket.close()); child.kill();

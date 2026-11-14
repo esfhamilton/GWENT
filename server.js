@@ -34,6 +34,21 @@ function actionIsAuthorised(socket, SID, player = socket.player) {
         socket.roomId === room && socket.player === player && socket.rooms && socket.rooms[room];
 }
 
+function playersPresent(room) {
+    const members = io.sockets.adapter.rooms[room];
+    if (!members) return false;
+    const players = Object.keys(members.sockets).map(id => io.sockets.sockets[id].player);
+    return players.includes('A') && players.includes('B');
+}
+function notifyPresence(room) {
+    if (gameData[room + 'A'] && gameData[room + 'B']) {
+        io.in(room).emit(playersPresent(room) ? 'playersConnected' : 'playerDisconnected');
+    }
+}
+function gameActionAllowed(socket, room, player = socket.player) {
+    return actionIsAuthorised(socket, room, player) && playersPresent(room);
+}
+
 function rejectAction(socket) {
     socket.emit('invalidAction');
 }
@@ -167,6 +182,7 @@ io.on('connection', (socket) => {
         delete roomCleanupTimers[room];
         bindPlayer(socket, room, player);
         socket.emit('rejoined', room, player);
+        notifyPresence(room);
     });
 
     // Gets player details from client and stores them on server
@@ -180,6 +196,7 @@ io.on('connection', (socket) => {
         if (gameData[PID]) return rejectAction(socket);
         gameData[PID] = { faction, leader, deck: deck.slice(), hand: [], discarded: [], fullDeck: deck.slice() };
         socket.emit('playerAssignment', socket.player);
+        notifyPresence(room);
     });
     
     // Returns corresponding deck to the player
@@ -228,7 +245,7 @@ io.on('connection', (socket) => {
     // Checks if players have redrawn the starting hand
     socket.on('cardsRedrawn', (SID, player, deck, firstTurn) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, player) || !validStrings(deck) || !gameData[room + player]) return rejectAction(socket);
+        if (!gameActionAllowed(socket, room, player) || !validStrings(deck) || !gameData[room + player]) return rejectAction(socket);
         gameData[room + player]["deck"] = deck;
         if(firstTurn === 'A' || firstTurn === 'B') roomFirstTurn[room] = firstTurn;
         if(room in redrawnCheck) {
@@ -247,7 +264,7 @@ io.on('connection', (socket) => {
 
     socket.on('passTurn', (SID) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player)) return rejectAction(socket);
+        if (!gameActionAllowed(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player)) return rejectAction(socket);
         roomPassCount[room] = (roomPassCount[room] || 0) + 1;
         if (roomPassCount[room] === 2) {
             roomPassCount[room] = 0;
@@ -273,27 +290,27 @@ io.on('connection', (socket) => {
 
     socket.on('sendMonsterCard', (SID, player, cardId, posId) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, player) || typeof cardId !== 'string' || typeof posId !== 'string') return rejectAction(socket);
+        if (!gameActionAllowed(socket, room, player) || typeof cardId !== 'string' || typeof posId !== 'string') return rejectAction(socket);
         let opPlayer = otherPlayer(player);
         io.in(room).emit('syncMonsterCard', opPlayer, cardId, 'op'+posId.substring(0,1).toUpperCase()+posId.substring(1));
     });
 
     socket.on('getOpponentHand', (SID, player) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, player)) return rejectAction(socket);
+        if (!gameActionAllowed(socket, room, player)) return rejectAction(socket);
         io.in(room).emit('opponentHandRequested', otherPlayer(player));
     });
     
     socket.on('opponentHandRevealed', (SID, opPlayer, cardsToReveal) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, opPlayer) || !validStrings(cardsToReveal)) return rejectAction(socket);
+        if (!gameActionAllowed(socket, room, opPlayer) || !validStrings(cardsToReveal)) return rejectAction(socket);
         io.in(room).emit('revealOpHandToPlayer', otherPlayer(opPlayer), cardsToReveal.slice(0, 3));
     });
     
     // Switches turn and passes on player choice to opponent 
     socket.on('switchTurn', (SID, cardIDs, posIDs, cardsInHand, abilityUsed) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player) ||
+        if (!gameActionAllowed(socket, room) || (roomTurn[room] && roomTurn[room] !== socket.player) ||
             !validStrings(cardIDs) || !validStrings(posIDs) || !Number.isInteger(cardsInHand) || cardsInHand < 0 || cardsInHand > 150 || typeof abilityUsed !== 'boolean') {
             return rejectAction(socket);
         }
@@ -321,7 +338,7 @@ io.on('connection', (socket) => {
     
     socket.on('endGame', (SID, player) => {
         const room = roomId(SID);
-        if (!actionIsAuthorised(socket, room, player)) return rejectAction(socket);
+        if (!gameActionAllowed(socket, room, player)) return rejectAction(socket);
         // Call only needs to be emit once to room
         if(player == 'A'){
             io.in(room).emit('results');
@@ -331,7 +348,7 @@ io.on('connection', (socket) => {
     // Start a new match only when both players have explicitly opted in.
     socket.on('playAgain', (SID, player) => {
         const roomIdValue = roomId(SID);
-        if (!actionIsAuthorised(socket, roomIdValue, player)) return rejectAction(socket);
+        if (!gameActionAllowed(socket, roomIdValue, player)) return rejectAction(socket);
         if (!(roomIdValue in rematchCheck)) rematchCheck[roomIdValue] = {};
         rematchCheck[roomIdValue][player] = true;
 
@@ -354,6 +371,7 @@ io.on('connection', (socket) => {
     });
     
     socket.on('disconnect', () => {
+        if (socket.roomId) notifyPresence(socket.roomId);
         // Give page refreshes time to reconnect, then release genuinely idle rooms.
         openRooms.forEach((SID) => {
             const room = roomId(SID);
