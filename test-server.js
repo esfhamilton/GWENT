@@ -2,7 +2,7 @@ const assert = require('assert');
 const { spawn } = require('child_process');
 const io = require('socket.io-client');
 const port = 56000 + Math.floor(Math.random() * 1000);
-const child = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port), ROOM_CAPACITY: '1', ROOM_CLEANUP_DELAY_MS: '400', ROOM_IDLE_MS: '10000' }, stdio: 'inherit' });
+const child = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port), ROOM_CAPACITY: '1', ROOM_CLEANUP_DELAY_MS: '400', ROOM_IDLE_MS: '1500' }, stdio: 'inherit' });
 const clients = [];
 function event(socket, name) {
     return new Promise((resolve, reject) => {
@@ -19,6 +19,7 @@ async function connect() {
 async function main() {
     await new Promise(resolve => setTimeout(resolve, 500));
     const a = await connect();
+    let malformed = event(a, 'invalidRoom'); a.emit('joinRequest', { toString: null }); await malformed;
     let reply = event(a, 'invalidAction');
     a.emit('playerDeck', '12345', 'leader', [], 'faction');
     await reply;
@@ -41,7 +42,7 @@ async function main() {
     reply = event(b, 'invalidRoom'); b.emit('rejoinRequest', room, 'wrong'); await reply;
     reply = event(b, 'rejoined'); b.emit('rejoinRequest', room, token);
     assert.strictEqual((await reply)[1], 'A');
-    reply = event(b, 'roomsFull'); b.emit('createRequest'); await reply;
+    reply = event(b, 'invalidAction'); b.emit('createRequest'); await reply;
     b.close();
     await new Promise(resolve => setTimeout(resolve, 600));
     const c = await connect();
@@ -60,6 +61,10 @@ async function main() {
     const restored = event(c, 'playersConnected');
     reply = event(e, 'rejoined'); e.emit('rejoinRequest', room, dToken); await reply; await restored;
     reply = event(c, 'passedTurn'); c.emit('passTurn', room); await reply;
+    reply = event(c, 'roomExpired'); await reply;
+    const f = await connect();
+    reply = event(f, 'validRoom'); f.emit('createRequest');
+    assert.strictEqual((await reply)[0], room, 'idle connected room expires and its ID is reusable');
     console.log('Socket validation, lifecycle and reconnect tests passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {

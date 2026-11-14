@@ -5,9 +5,9 @@ const PORT = process.env.PORT || 5000;
 
 app.use(express.static('public'))
 
-server = app.listen(PORT);
+const server = app.listen(PORT);
 
-const io = require('socket.io')(server);
+const io = require('socket.io')(server, { maxHttpBufferSize: 65536 });
 
 let openRooms = new Set();
 let startCheck = {};
@@ -24,7 +24,11 @@ const ROOM_CAPACITY = Math.min(Number(process.env.ROOM_CAPACITY) || 89999, 89999
 let roomIdleTimers = {};
 let roomTokens = {};
 
-const roomId = (SID) => String(SID);
+const roomId = (SID) => {
+    if (typeof SID !== 'string' && typeof SID !== 'number') return '';
+    const room = String(SID);
+    return /^[0-9]{5}$/.test(room) ? room : '';
+};
 const otherPlayer = (player) => player === 'A' ? 'B' : 'A';
 const validStrings = (value, max = 150) => Array.isArray(value) && value.length <= max && value.every(item => typeof item === 'string' && item.length <= 100);
 
@@ -144,6 +148,7 @@ io.on('connection', (socket) => {
     });
     socket.on('joinRequest', (SID) => {
         const room = roomId(SID);
+        if (socket.roomId) return rejectAction(socket);
         if (!hasOpenRoom(room) || !io.sockets.adapter.rooms[room]) return socket.emit('invalidRoom', SID);
         if (roomTokens[room].B) return socket.emit('full', SID);
         roomTokens[room].B = crypto.randomBytes(24).toString('hex');
@@ -153,6 +158,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('createRequest', () => {
+        if (socket.roomId) return rejectAction(socket);
         if (openRooms.size >= ROOM_CAPACITY) return socket.emit('roomsFull');
         const first = Math.floor(Math.random() * ROOM_CAPACITY);
         let SID;
@@ -175,6 +181,7 @@ io.on('connection', (socket) => {
     // Reconnects user to room with each new page
     socket.on('rejoinRequest', (SID, token) => {
         const room = roomId(SID);
+        if (socket.roomId && socket.roomId !== room) return rejectAction(socket);
         const tokens = roomTokens[room];
         const player = tokens && typeof token === 'string' && ['A', 'B'].find(p => tokens[p] && tokens[p] === token);
         if (!hasOpenRoom(room) || !player) return socket.emit('invalidRoom', SID);
