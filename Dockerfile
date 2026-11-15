@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server.js ./
 COPY public ./public
+RUN chmod -R a+rX /app
 
 ENV NODE_ENV=production
 ENV PORT=5000
